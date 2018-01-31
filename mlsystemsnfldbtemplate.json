@@ -1,0 +1,1160 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "dbserver_name": {
+            "defaultValue": "nfldbrs1",
+            "type": "String"
+        },
+        "FunctionApp_name": {
+            "defaultValue": "NFLGameRS1",
+            "type": "String"
+        },
+        "storageAccount_name": {
+            "defaultValue": "nflgenstoragers",
+            "type": "String"
+        },
+        "dbpassword": {
+            "defaultValue": "P@sswor4!",
+            "type": "String"
+        }
+    },
+    "variables": {
+        "storageAccountName": "[concat(uniquestring(resourceGroup().id), 'azfunctions')]",
+        "storageAccountid": "[concat(resourceGroup().id,'/providers/','Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
+},
+    "resources": [
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Logic/workflows/GameDayData_PFunction_Blob'.",
+            "type": "Microsoft.Logic/workflows",
+            "name": "GameDayData_PFunction_Blob",
+            "apiVersion": "2016-06-01",
+            "location": "[resourceGroup().location]",
+            "tags": {},
+            "scale": null,
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Day",
+                                "interval": 15
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "Execute_stored_procedure": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCDrive]'))}"
+                            }
+                        },
+                        "Execute_stored_procedure_4": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCgame]'))}"
+                            }
+                        },
+                        "Execute_stored_procedure_5": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCplayplayer]'))}"
+                            }
+                        },
+                        "Execute_stored_procedure_6": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCplay]'))}"
+                            }
+                        },
+                        "Execute_stored_procedure_7": {
+                            "runAfter": {
+                                "Execute_stored_procedure": [
+                                    "Succeeded"
+                                ],
+                                "Execute_stored_procedure_4": [
+                                    "Succeeded"
+                                ],
+                                "Execute_stored_procedure_5": [
+                                    "Succeeded"
+                                ],
+                                "Execute_stored_procedure_6": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[LandNFL].[TruncateTables]'))}"
+                            }
+                        },
+                        "For_each": {
+                            "foreach": "@body('Get_rows')?['value']",
+                            "actions": {
+                                "Bulk_Load_Drive_to_SQL": {
+                                    "runAfter": {
+                                        "Load_Drive_to_Storage": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "eid": "@items('For_each')?['eid']",
+                                            "fileName": "@body('Load_Drive_to_Storage')?['Name']",
+                                            "filePath": "gamedayshred/@{items('For_each')?['seasonyear']}/"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[bulkloaddrive]'))}"
+                                    }
+                                },
+                                "Bulk_Load_Game_to_SQL": {
+                                    "runAfter": {
+                                        "Load_Game_to_Storage": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "eid": "@{items('For_each')?['eid']}",
+                                            "fileName": "@body('Load_Game_to_Storage')?['Name']",
+                                            "filePath": "gamedayshred/@{items('For_each')?['seasonyear']}/"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[bulkloadgame]'))}"
+                                    }
+                                },
+                                "Create_blob": {
+                                    "runAfter": {
+                                        "PShred_PlayerPlay": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_PlayerPlay')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')?['seasonyear']}",
+                                            "name": "@{items('For_each')?['eid']}_playerplay.csv"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Create_blob_2": {
+                                    "runAfter": {
+                                        "HTTP": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedaydatajson",
+                                            "name": "@{items('For_each')?['eid']}"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Execute_stored_procedure_2": {
+                                    "runAfter": {
+                                        "Load_PPlay_to_Storage": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "eid": "@{items('For_each')?['eid']}",
+                                            "fileName": "@body('Load_PPlay_to_Storage')?['Name']",
+                                            "filePath": "gamedayshred/@{items('For_each')?['seasonyear']}/"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[bulkloadplay]'))}"
+                                    }
+                                },
+                                "Execute_stored_procedure_3": {
+                                    "runAfter": {
+                                        "Create_blob": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "eid": "@{items('For_each')?['eid']}",
+                                            "fileName": "@body('Create_blob')?['Name']",
+                                            "filePath": "gamedayshred/@{items('For_each')?['seasonyear']}/"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[bulkloadplayplayer]'))}"
+                                    }
+                                },
+                                "HTTP": {
+                                    "runAfter": {},
+                                    "type": "Http",
+                                    "inputs": {
+                                        "method": "GET",
+                                        "uri": "http://www.nfl.com/liveupdate/game-center/@{items('For_each')?['eid']}/@{items('For_each')?['eid']}_gtd.json"
+                                    }
+                                },
+                                "Load_Drive_to_Storage": {
+                                    "runAfter": {
+                                        "PShred_Drive": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_Drive')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')?['seasonyear']}",
+                                            "name": "@{items('For_each')?['eid']}_drive.csv"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Load_Game_to_Storage": {
+                                    "runAfter": {
+                                        "PShred_Game": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_Game')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')?['seasonyear']}",
+                                            "name": "@{items('For_each')?['eid']}_game.csv"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Load_PPlay_to_Storage": {
+                                    "runAfter": {
+                                        "PShred_Play": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_Play')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')?['seasonyear']}",
+                                            "name": "@{items('For_each')?['eid']}_play.csv"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "PShred_Drive": {
+                                    "runAfter": {
+                                        "Create_blob_2": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1,\"crntdrv\": 3, \"plays\": 4 }",
+                                            "incl": "{\"drives\":2}",
+                                            "melded": "{\"end\": 4, \"start\": 4 }",
+                                            "pivotix": "[[4]"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "PShred_Game": {
+                                    "runAfter": {
+                                        "Create_blob_2": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1}",
+                                            "incl": "{\"away\":2,\"home\":2,\"team\":4,\"1\":4,\"2\":4,\"3\":4,\"4\":4,\"5\":4,\"T\":4}",
+                                            "melded": "{\"away\":2,\"home\":2,\"stats\":3,\"score\":3,\"team\":4}",
+                                            "pivotix": "[[2]"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "PShred_Play": {
+                                    "runAfter": {
+                                        "Create_blob_2": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1,\"crntdrv\": 3, \"players\": 6 }",
+                                            "incl": "{\"drives\":2,\"plays\": 4}",
+                                            "melded": "{}",
+                                            "pivotix": "[[6]"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "PShred_PlayerPlay": {
+                                    "runAfter": {
+                                        "Create_blob_2": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1,\"crntdrv\": 3}",
+                                            "incl": "{\"drives\":2,\"plays\": 4,\"players\":6}",
+                                            "melded": "{}",
+                                            "pivotix": "[[8]"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Get_rows": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach",
+                            "runtimeConfiguration": {
+                                "concurrency": {
+                                    "repetitions": 1
+                                }
+                            }
+                        },
+                        "Get_rows": {
+                            "runAfter": {
+                                "Set_Week": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/datasets/default/tables/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[Schedule]'))}/items",
+                                "queries": {
+                                    "$filter": "SeasonYear eq @{variables('SeasonYear')} and wkNumber gt 0",
+                                    "$select": "eid, SeasonYear, wkNumber",
+                                    "$top": 1
+                                }
+                            }
+                        },
+                        "Set_Season_Year": {
+                            "runAfter": {},
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "SeasonYear",
+                                        "type": "Integer",
+                                        "value": 2017
+                                    }
+                                ]
+                            }
+                        },
+                        "Set_Week": {
+                            "runAfter": {
+                                "Set_Season_Year": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "Week",
+                                        "type": "Integer",
+                                        "value": 2
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azureblob_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', 'azureblob-1')]",
+                                "connectionName": "azureblob-1",
+                                "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azureblob')]"
+                            },
+                            "sql_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', 'sql-1')]",
+                                "connectionName": "sql-1",
+                                "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/sql')]"
+                            }
+                        }
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('FunctionApp_name'))]",
+                "[resourceId('Microsoft.Web/connections', 'azureblob-1')]",
+                "[resourceId('Microsoft.Web/connections', 'sql-1')]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Logic/workflows/LoadNFLSchedule'.",
+            "type": "Microsoft.Logic/workflows",
+            "name": "LoadNFLSchedule",
+            "apiVersion": "2016-06-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "Solution": "Final"
+            },
+            "scale": null,
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Week",
+                                "interval": 1
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "Build_Schedule": {
+                            "runAfter": {
+                                "CDC_Schedule_": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[NFLDB].[BuildSchedule]'))}"
+                            }
+                        },
+                        "CDC_Schedule_": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCSchedule]'))}"
+                            }
+                        },
+                        "Execute_a_SQL_query": {
+                            "runAfter": {
+                                "Get_rows": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "TRUNCATE TABLE LandNFL.Schedule"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "For_each": {
+                            "foreach": "@body('Get_rows')?['value']",
+                            "actions": {
+                                "Create_blob": {
+                                    "runAfter": {
+                                        "HTTP": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/nflschedule",
+                                            "name": "@{variables('Year')}_@{items('For_each')?['SeasonType']}_@{items('For_each')?['Week']}.xml"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "HTTP": {
+                                    "runAfter": {},
+                                    "type": "Http",
+                                    "inputs": {
+                                        "method": "GET",
+                                        "uri": "http://www.nfl.com/ajax/scorestrip?season=@{variables('Year')}&seasonType=@{items('For_each')?['SeasonType']}&week=@{items('For_each')?['Week']}"
+                                    }
+                                },
+                                "Insert_row": {
+                                    "runAfter": {
+                                        "Create_blob": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "ScheduleXML": "@{body('HTTP')}"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/tables/@{encodeURIComponent(encodeURIComponent('[LandNFL].[Schedule]'))}/items"
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Execute_a_SQL_query": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        },
+                        "Get_rows": {
+                            "runAfter": {
+                                "Set_Year": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/datasets/default/tables/@{encodeURIComponent(encodeURIComponent('[NFLDB].[ScheduleDefinition]'))}/items"
+                            }
+                        },
+                        "Set_Year": {
+                            "runAfter": {},
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "Year",
+                                        "type": "Integer",
+                                        "value": 2017
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azureblob_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', 'azureblob-1')]",
+                                "connectionName": "azureblob-1",
+                                "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azureblob')]"
+                            },
+                            "sql_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', 'sql-1')]",
+                                "connectionName": "sql-1",
+                                "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/sql')]"
+                            }
+                        }
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', 'azureblob-1')]",
+                "[resourceId('Microsoft.Web/connections', 'sql-1')]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1'.",
+            "type": "Microsoft.Sql/servers",
+            "kind": "v12.0",
+            "name": "[parameters('dbserver_name')]",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "administratorLogin": "dbadmin",
+                "administratorLoginPassword":"[parameters('dbpassword')]",
+                "version": "12.0"
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Storage/storageAccounts/aiea47qbhs3woazfunctions'.",
+            "type": "Microsoft.Storage/storageAccounts",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "Storage",
+            "name": "[variables('storageAccountName')]",
+            "apiVersion": "2017-06-01",
+            "location": "[resourceGroup().location]",
+            "tags": {},
+            "scale": null,
+            "properties": {
+                "encryption": {
+                    "services": {
+                        "file": {
+                            "enabled": true
+                        },
+                        "blob": {
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Storage/storageAccounts/nflgenstoragers'.",
+            "type": "Microsoft.Storage/storageAccounts",
+            "sku": {
+                "name": "Standard_RAGRS",
+                "tier": "Standard"
+            },
+            "kind": "Storage",
+            "name": "[parameters('storageAccount_name')]",
+            "apiVersion": "2017-06-01",
+            "location": "[resourceGroup().location]",
+            "tags": {},
+            "scale": null,
+            "properties": {
+                "supportsHttpsTrafficOnly": false,
+                "encryption": {
+                    "services": {
+                        "file": {
+                            "enabled": true
+                        },
+                        "blob": {
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/connections/azureblob-1'.",
+            "type": "Microsoft.Web/connections",
+            "name": "azureblob-1",
+            "apiVersion": "2016-06-01",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "displayName": "blobconnection",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azureblob')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/connections/sql-1'.",
+            "type": "Microsoft.Web/connections",
+            "name": "sql-1",
+            "apiVersion": "2016-06-01",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "displayName": "sqlconnection",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/sql')]"
+                }
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/serverfarms/NFLGameRS1'.",
+            "type": "Microsoft.Web/serverfarms",
+            "sku": {
+                "name": "Y1",
+                "tier": "Dynamic",
+                "size": "Y1",
+                "family": "Y",
+                "capacity": 0
+            },
+            "kind": "functionapp",
+            "name": "[parameters('FunctionApp_name')]",
+            "apiVersion": "2016-09-01",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "name": "[parameters('FunctionApp_name')]",
+                "workerTierName": null,
+                "adminSiteName": null,
+                "hostingEnvironmentProfile": null,
+                "perSiteScaling": false,
+                "reserved": false,
+                "targetWorkerCount": 0,
+                "targetWorkerSizeId": 0
+            },
+            "dependsOn": []
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/sites/NFLGameRS1'.",
+            "type": "Microsoft.Web/sites",
+            "kind": "functionapp",
+            "name": "[parameters('FunctionApp_name')]",
+            "apiVersion": "2016-08-01",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "[concat(parameters('FunctionApp_name'),parameters('FunctionApp_name'),'.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "virtualIP": null,
+                        "thumbprint": null,
+                        "toUpdate": null,
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "[concat(parameters('FunctionApp_name'),parameters('FunctionApp_name'),'.scm.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "virtualIP": null,
+                        "thumbprint": null,
+                        "toUpdate": null,
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('FunctionApp_name'))]",
+                "reserved": false,
+                "siteConfig": null,
+                "scmSiteAlsoStopped": false,
+                "hostingEnvironmentProfile": null,
+                "clientAffinityEnabled": true,
+                "clientCertEnabled": false,
+                "hostNamesDisabled": false,
+                "containerSize": 1536,
+                "dailyMemoryTimeQuota": 0,
+                "cloningInfo": null
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('FunctionApp_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1/databases/nfldbrs1'.",
+            "type": "Microsoft.Sql/servers/databases",
+            "kind": "v12.0,user",
+            "name": "[concat(parameters('dbserver_name'), '/nfldb')]",
+            "apiVersion": "2014-04-01-preview",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "edition": "Standard",
+                "status": "Online",
+                "serviceLevelObjective": "S0",
+                "collation": "SQL_Latin1_General_CP1_CI_AS",
+                "maxSizeBytes": "268435456000",
+                "sampleName": null,
+                "defaultSecondaryLocation": "West US",
+                "elasticPoolName": null,
+                "containmentState": 2,
+                "readScale": "Disabled",
+                "failoverGroupId": null,
+                "zoneRedundant": false,
+                "isUpgradeRequested": false
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('dbserver_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1/firewallRules/AllowAllWindowsAzureIps'.",
+            "type": "Microsoft.Sql/servers/firewallRules",
+            "kind": "v12.0",
+            "name": "[concat(parameters('dbserver_name'), '/AllowAllWindowsAzureIps')]",
+            "apiVersion": "2014-04-01-preview",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "startIpAddress": "0.0.0.0",
+                "endIpAddress": "0.0.0.0"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('dbserver_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1/encryptionProtector/current'.",
+            "type": "Microsoft.Sql/servers/encryptionProtector",
+            "kind": "servicemanaged",
+            "name": "[concat(parameters('dbserver_name'), '/current')]",
+            "apiVersion": "2015-05-01-preview",
+            "scale": null,
+            "properties": {
+                "serverKeyName": "ServiceManaged",
+                "serverKeyType": "ServiceManaged"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('dbserver_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1/databases/nfldbrs1/transparentDataEncryption/current'.",
+            "type": "Microsoft.Sql/servers/databases/transparentDataEncryption",
+            "name": "[concat(parameters('dbserver_name'), '/nfldb/current')]",
+            "apiVersion": "2014-04-01",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "status": "Enabled"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('dbserver_name'))]",
+                "[resourceId('Microsoft.Sql/servers/databases', parameters('dbserver_name'), 'nfldb')]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/sites/NFLGameRS1/config/web'.",
+            "type": "Microsoft.Web/sites/config",
+            "name": "[concat(parameters('FunctionApp_name'), '/web')]",
+            "apiVersion": "2016-08-01",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "numberOfWorkers": 1,
+                "defaultDocuments": [
+                    "Default.htm",
+                    "Default.html",
+                    "Default.asp",
+                    "index.htm",
+                    "index.html",
+                    "iisstart.htm",
+                    "default.aspx",
+                    "index.php"
+                ],
+                "netFrameworkVersion": "v4.0",
+                "phpVersion": "5.6",
+                "pythonVersion": "",
+                "nodeVersion": "",
+                "linuxFxVersion": "",
+                "requestTracingEnabled": false,
+                "remoteDebuggingEnabled": false,
+                "remoteDebuggingVersion": null,
+                "httpLoggingEnabled": false,
+                "logsDirectorySizeLimit": 35,
+                "detailedErrorLoggingEnabled": false,
+                "publishingUsername": "[concat('$',parameters('FunctionApp_name'))]",
+                "publishingPassword": null,
+                "appSettings": null,
+                "metadata": null,
+                "connectionStrings": null,
+                "machineKey": null,
+                "handlerMappings": null,
+                "documentRoot": null,
+                "scmType": "None",
+                "use32BitWorkerProcess": true,
+                "webSocketsEnabled": false,
+                "alwaysOn": false,
+                "javaVersion": null,
+                "javaContainer": null,
+                "javaContainerVersion": null,
+                "appCommandLine": "",
+                "managedPipelineMode": "Integrated",
+                "virtualApplications": [
+                    {
+                        "virtualPath": "/",
+                        "physicalPath": "site\\wwwroot",
+                        "preloadEnabled": false,
+                        "virtualDirectories": null
+                    }
+                ],
+                "winAuthAdminState": 0,
+                "winAuthTenantState": 0,
+                "customAppPoolIdentityAdminState": false,
+                "customAppPoolIdentityTenantState": false,
+                "runtimeADUser": null,
+                "runtimeADUserPassword": null,
+                "loadBalancing": "LeastRequests",
+                "routingRules": [],
+                "experiments": {
+                    "rampUpRules": []
+                },
+                "limits": null,
+                "autoHealEnabled": false,
+                "autoHealRules": null,
+                "tracingOptions": null,
+                "vnetName": "",
+                "siteAuthEnabled": false,
+                "siteAuthSettings": {
+                    "enabled": null,
+                    "unauthenticatedClientAction": null,
+                    "tokenStoreEnabled": null,
+                    "allowedExternalRedirectUrls": null,
+                    "defaultProvider": null,
+                    "clientId": null,
+                    "clientSecret": null,
+                    "issuer": null,
+                    "allowedAudiences": null,
+                    "additionalLoginParams": null,
+                    "isAadAutoProvisioned": false,
+                    "googleClientId": null,
+                    "googleClientSecret": null,
+                    "googleOAuthScopes": null,
+                    "facebookAppId": null,
+                    "facebookAppSecret": null,
+                    "facebookOAuthScopes": null,
+                    "twitterConsumerKey": null,
+                    "twitterConsumerSecret": null,
+                    "microsoftAccountClientId": null,
+                    "microsoftAccountClientSecret": null,
+                    "microsoftAccountOAuthScopes": null
+                },
+                "cors": {
+                    "allowedOrigins": [
+                        "https://functions.azure.com",
+                        "https://functions-staging.azure.com",
+                        "https://functions-next.azure.com"
+                    ]
+                },
+                "push": null,
+                "apiDefinition": null,
+                "autoSwapSlotName": null,
+                "localMySqlEnabled": false,
+                "managedServiceIdentityId": null,
+                "ipSecurityRestrictions": null
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('FunctionApp_name'))]"
+            ]
+        },
+        {
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/sites/NFLGameRS1/hostNameBindings/nflgamers1.azurewebsites.net'.",
+            "type": "Microsoft.Web/sites/hostNameBindings",
+            "name": "[concat(parameters('FunctionApp_name'),'/',parameters('FunctionApp_name'),'.azurewebsites.net')]",
+            "apiVersion": "2016-08-01",
+            "location": "[resourceGroup().location]",
+            "scale": null,
+            "properties": {
+                "siteName": "[parameters('FunctionApp_name')]",
+                "domainId": null,
+                "hostNameType": "Verified"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('FunctionApp_name'))]"
+            ]
+        }
+    ]
+}
