@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<BCPFORMAT xmlns="http://schemas.microsoft.com/sqlserver/2004/bulkload/format" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <RECORD>
+  <FIELD ID="1" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="12"/>
+  <FIELD ID="2" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="3" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="4" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="5" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="6" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="7" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="8" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="9" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="10" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="11" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="12" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="13" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="14" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="15" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="16" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="17" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="18" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+   <FIELD ID="19" xsi:type="CharTerm" TERMINATOR="," MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+  <FIELD ID="20" xsi:type="CharTerm" TERMINATOR="\r\n" MAX_LENGTH="50" COLLATION="SQL_Latin1_General_CP1_CI_AS"/>
+ </RECORD>
+ <ROW>
+  <COLUMN SOURCE="1" NAME="eid" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="3" NAME="drivenumber" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="13" NAME="start-team" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="14" NAME="start-qtr" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="15" NAME="start-time" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="12" NAME="start-yrdln" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="9" NAME="end-team" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="10" NAME="end-qtr" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="11" NAME="end-time" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="8" NAME="end-yrdln" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="4" NAME="posteam" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="7" NAME="postime" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="19" NAME="qtr" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="18" NAME="numplays" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="17" NAME="result" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="5" NAME="ydsgained" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="16" NAME="fds" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="20" NAME="penyds" xsi:type="SQLVARYCHAR"/>
+  <COLUMN SOURCE="6" NAME="redzone" xsi:type="SQLVARYCHAR"/>
+ </ROW>
+</BCPFORMAT>
