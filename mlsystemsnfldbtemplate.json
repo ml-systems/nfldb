@@ -399,11 +399,6 @@
                                             "melded": "{\"end\": 4, \"start\": 4 }",
                                             "pivotix": "[[4]"
                                         }
-                                    },
-                                    "runtimeConfiguration": {
-                                        "contentTransfer": {
-                                            "transferMode": "Chunked"
-                                        }
                                     }
                                 },
                                 "PShred_Game": {
@@ -423,11 +418,6 @@
                                             "incl": "{\"away\":2,\"home\":2,\"team\":4,\"1\":4,\"2\":4,\"3\":4,\"4\":4,\"5\":4,\"T\":4}",
                                             "melded": "{\"away\":2,\"home\":2,\"stats\":3,\"score\":3,\"team\":4}",
                                             "pivotix": "[[2]"
-                                        }
-                                    },
-                                    "runtimeConfiguration": {
-                                        "contentTransfer": {
-                                            "transferMode": "Chunked"
                                         }
                                     }
                                 },
@@ -449,11 +439,6 @@
                                             "melded": "{}",
                                             "pivotix": "[[6]"
                                         }
-                                    },
-                                    "runtimeConfiguration": {
-                                        "contentTransfer": {
-                                            "transferMode": "Chunked"
-                                        }
                                     }
                                 },
                                 "PShred_PlayerPlay": {
@@ -473,11 +458,6 @@
                                             "incl": "{\"drives\":2,\"plays\": 4,\"players\":6}",
                                             "melded": "{}",
                                             "pivotix": "[[8]"
-                                        }
-                                    },
-                                    "runtimeConfiguration": {
-                                        "contentTransfer": {
-                                            "transferMode": "Chunked"
                                         }
                                     }
                                 }
