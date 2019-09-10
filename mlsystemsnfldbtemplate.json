@@ -3,11 +3,11 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "dbserver_name": {
-            "defaultValue": "nfldbrs1",
+            "defaultValue": "nfldbrs",
             "type": "String"
         },
         "FunctionApp_name": {
-            "defaultValue": "NFLGameRS1",
+            "defaultValue": "NFLGamers",
             "type": "String"
         },
         "storageAccount_name": {
@@ -24,8 +24,37 @@
         "storageAccountid": "[concat(resourceGroup().id,'/providers/','Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]"
 },
     "resources": [
+		{
+			"name": "[concat(parameters('FunctionApp_name'),'/PShredder')]",
+			"type": "Microsoft.Web/sites/functions",
+			"apiVersion": "2015-08-01",
+			"properties": {
+				"config": {
+					  "bindings": [
+						{
+						  "name": "req",
+						  "webHookType": "genericJson",
+						  "direction": "in",
+						  "type": "httpTrigger"
+						},
+						{
+						  "name": "res",
+						  "direction": "out",
+						  "type": "http"
+						}
+					  ],
+					"disabled": false
+				},
+				"files": {
+					"run.py": "import json\nimport types\nimport io\nimport csv\nimport copy\nimport os\n\nfrom io import BytesIO\nimport sys, os.path\n\ndef iterprint(dat,objkey,objval,included={},excluded={},melded={},level=1,rider=[]):\n    global daty\n    daty=dat\n    if included.get(str(objkey),\"\")==level or level not in included.values():\n        if excluded.get(str(objkey),\"\")!=level:\n            if isinstance(objval,dict):\n                if not rider:\n                    rider.append(objkey)\n                else:\n                    \n                    if melded.get(str(objkey),\"\")==level:\n                        if rider[len(rider)-1][-1]=='-':\n                            rider[len(rider)-1]+=(str(objkey)+'-')\n                        else:\n                            rider.append(str(objkey)+'-')\n                    else:\n                        if rider[len(rider)-1][-1]=='-':\n                            rider[len(rider)-1]+=str(objkey)\n                        else:\n                            rider.append(objkey)\n                level+=1\n                for dictkey, dictval in objval.items():\n                    rider2 = copy.deepcopy(rider)  \n                    iterprint(daty,dictkey,dictval,included,excluded,melded,level,rider2)\n            elif isinstance(objval,list):\n                if not rider:\n                    rider.append(objkey)\n                else:\n                    if melded.get(str(objkey),\"\")==level:\n                        if rider[len(rider)-1][-1]=='-':\n                            rider[len(rider)-1]+=(str(objkey)+'-')\n                        else:\n                            rider.append(str(objkey)+'-')\n                    else:\n                        if rider[len(rider)-1][-1]=='-':\n                            rider[len(rider)-1]+=str(objkey)\n                        else:\n                            rider.append(objkey)\n\n                level+=1\n                for itm in objval:\n                    if isinstance(itm,dict):\n                        for dictkey, dictval in itm.items():\n                            rider2 = copy.deepcopy(rider)\n                            iterprint(daty,dictkey,dictval,included,excluded,melded,level,rider2)\n                    elif isinstance(itm,list):\n                        lkey=''\n                        for lval in itm:\n                            rider2 = copy.deepcopy(rider) \n                            iterprint(daty,lkey,lval,included,excluded,melded,level,rider2)\n                    else:\n                        if rider[len(rider)-1][-1]=='-':\n                            rider[len(rider)-1]+=(str(objkey))\n                            rider.append(objval)\n                            daty.append(rider)\n                            rider=[]\n                        else:\n                            rider.append(objkey)\n                            rider.append(objval)\n                            daty.append(rider)\n                            rider=[]\n            else:\n                if not rider:\n                    rider.append(objkey)\n                    rider.append(objval)\n                    daty.append(rider)\n                    rider=[]\n                else:\n                    if rider[len(rider)-1][-1]=='-':\n                        rider[len(rider)-1]+=(str(objkey))\n                        rider.append(objval)\n                        daty.append(rider)\n                        rider=[]\n                    else: \n                        rider.append(objkey)\n                        rider.append(objval)\n                        daty.append(rider)\n                        rider=[]\n        \n\ndef column(matrix, i):\n    return [row[i] for row in matrix]\n\ndef pivt(originallist,pivotedcolumn):\n    pivotedcolumnset=set()\n    originalpivotedcolumnlist=column(originallist,pivotedcolumn-1)\n    pivotedcolumnsetlist = [x for x in originalpivotedcolumnlist if x not in pivotedcolumnset and (pivotedcolumnset.add(x) or True)]\n    pivotedcolumnsetdict = {}\n    vals = range(len(originallist[0])-1,len(originallist[0])+len(pivotedcolumnset)-1)\n    for i in vals:\n        pivotedcolumnsetdict[pivotedcolumnsetlist[i-len(originallist[0])-1]] = i\n\n    withoutpivotedmdlist=[]\n    for row in originallist:\n        currentrowlist=[]\n        for index, col in enumerate(row):\n            if (index!=(pivotedcolumn-1) and index!=(len(row)-1)): currentrowlist.append(col)\n        withoutpivotedmdlist.append(currentrowlist)\n\n    uniquewithoutpivotedmdlist = [list(x) for x in set(tuple(x) for x in withoutpivotedmdlist)]\n\n\n    for row in uniquewithoutpivotedmdlist:\n        for key,val in pivotedcolumnsetdict.items():\n            row.append('')\n\n    \n    j=0        \n            \n    for pivotedcolumnsetdictkey, pivotedcolumnsetdictval in pivotedcolumnsetdict.items():\n        for uniquewithoutpivotedmdlistrow in uniquewithoutpivotedmdlist:\n            preuniquewpivoted=uniquewithoutpivotedmdlistrow[:(pivotedcolumn-1)]+[pivotedcolumnsetdictkey]+uniquewithoutpivotedmdlistrow[pivotedcolumn:-1]\n            uniquewpivoted=preuniquewpivoted[:len(originallist[0])-1]\n            for originallistrow in originallist:\n                if originallistrow[:-1]==uniquewpivoted:\n                    uniquewithoutpivotedmdlistrow[pivotedcolumnsetdictval-1]=originallistrow[-1]\n    return uniquewithoutpivotedmdlist\n\n\ndef csvify(x):\n    output = io.BytesIO()\n    writer = csv.writer(output, quoting=csv.QUOTE_NONNUMERIC,lineterminator='\\n')\n\n    for ro in x:\n        writer.writerow(ro)\n    return output.getvalue()\n\n\npostreqdata = json.loads(open(os.environ['req']).read())\nresponse = open(os.environ['res'], 'w')\n\nexcl= json.loads(os.environ['REQ_QUERY_EXCL'])\nincl= json.loads(os.environ['REQ_QUERY_INCL'])\nmelded= json.loads(os.environ['REQ_QUERY_MELDED'])\npivotix= json.loads(os.environ['REQ_QUERY_PIVOTIX'])\n\nglobal daty\ndaty=[]\n\nlevel=1\nrider=[]\nfor firstlevelkey, firstlevelval in postreqdata.items():\n    rider2=copy.deepcopy(rider)\n    iterprint(daty,firstlevelkey,firstlevelval,incl,excl,melded,level,rider2)\n\nfor roo in daty:\n    roo[0]=int(roo[0])\n\nif not pivotix:\n    y=csvify(daty)\nelse:\n    y=csvify(pivt(daty,pivotix[0]))\n\nresponse.write(y)\nresponse.close()"
+				}
+			},
+			"dependsOn":[
+			"[resourceId('Microsoft.Web/sites', parameters('FunctionApp_name'))]"
+			]
+		},
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Logic/workflows/GameDayData_PFunction_Blob'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Logic/workflows/GameDayData_PFunction_Blob'.",
             "type": "Microsoft.Logic/workflows",
             "name": "GameDayData_PFunction_Blob",
             "apiVersion": "2016-06-01",
@@ -44,12 +73,33 @@
                         }
                     },
                     "triggers": {
-                        "Recurrence": {
-                            "recurrence": {
-                                "frequency": "Day",
-                                "interval": 15
-                            },
-                            "type": "Recurrence"
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "$id": "http://example.com/root.json",
+                                    "$schema": "http://json-schema.org/draft-07/schema#",
+                                    "definitions": {},
+                                    "properties": {
+                                        "hi": {
+                                            "$id": "#/properties/hi",
+                                            "default": "",
+                                            "examples": [
+                                                ""
+                                            ],
+                                            "pattern": "^(.*)$",
+                                            "title": "The Hi Schema",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "hi"
+                                    ],
+                                    "title": "The Root Schema",
+                                    "type": "object"
+                                }
+                            }
                         }
                     },
                     "actions": {
@@ -549,11 +599,1593 @@
             "dependsOn": [
                 "[resourceId('Microsoft.Web/sites', parameters('FunctionApp_name'))]",
                 "[resourceId('Microsoft.Web/connections', 'azureblob-1')]",
-                "[resourceId('Microsoft.Web/connections', 'sql-1')]"
+                "[resourceId('Microsoft.Web/connections', 'sql-1')]",
+				"[resourceId('Microsoft.Logic/workflows', 'LoadNFLSchedule')]"
+            ]
+        },
+		{
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "SetupSQLDB",
+            "location": "centralus",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', 'sql-1')]",
+				"[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]",
+				"[resourceId('Microsoft.Sql/servers', parameters('dbserver_name'))]",
+				"[resourceId('Microsoft.Sql/servers/encryptionProtector',parameters('dbserver_name'),'current')]"
+            ],
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "$id": "http://example.com/root.json",
+                                    "$schema": "http://json-schema.org/draft-07/schema#",
+                                    "definitions": {},
+                                    "properties": {
+                                        "hi": {
+                                            "$id": "#/properties/hi",
+                                            "default": "",
+                                            "examples": [
+                                                ""
+                                            ],
+                                            "pattern": "^(.*)$",
+                                            "title": "The Hi Schema",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "hi"
+                                    ],
+                                    "title": "The Root Schema",
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Execute_a_SQL_query": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE SCHEMA [MasterNFL]\n"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_10": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_9": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [MasterNFL].[Schedule](\n\t[eid] [int] NOT NULL,\n\t[gsis] [int] NOT NULL,\n\t[SeasonYear] [smallint] NULL,\n\t[SeasonType] [varchar](4) NULL,\n\t[SeasonTypeDetail] [varchar](4) NULL,\n\t[wkNumber] [smallint] NULL,\n\t[DayName] [varchar](3) NULL,\n\t[GameTime] [time](7) NULL,\n\t[GameTimeUTC] [time](7) NULL,\n\t[Qtr] [varchar](1) NULL,\n\t[HomeTeam] [varchar](8) NULL,\n\t[HomeTeamName] [varchar](32) NULL,\n\t[AwayTeam] [varchar](8) NULL,\n\t[AwayTeamName] [varchar](32) NULL,\n\t[createts] [datetime] NULL,\n\t[modifyts] [datetime] NULL,\n\t[deletets] [datetime] NULL,\n CONSTRAINT [PK_Schedule] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_11": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_10": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE VIEW [NFLDB].[Schedule_vw]\nAS\n\nSELECT \n\teid GameID,\n    SeasonYear ,\n    SeasonType ,\n    SeasonTypeDetail ,\n    wkNumber ,\n    DayName ,\n    GameTime ,\n    GameTimeUTC ,\n    Qtr ,\n    HomeTeam ,\n    HomeTeamName ,\n    AwayTeam ,\n    AwayTeamName \n\n  FROM [MasterNFL].[Schedule]\n  WHERE\t deletets IS NULL "
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_12": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_11": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [dbo].[ProcedureLog](\n\t[ProcedureLogKey] [int] IDENTITY(1,1) NOT NULL,\n\t[ProcessName] [nvarchar](256) NULL,\n\t[SchemaName] [nvarchar](256) NULL,\n\t[ProcedureName] [varchar](300) NULL,\n\t[TableName] [nvarchar](256) NULL,\n\t[RecordsReceived] [int] NULL,\n\t[RecordsInserted] [int] NULL,\n\t[RecordsUpdated] [int] NULL,\n\t[RecordsDeleted] [int] NULL,\n\t[StartTime] [datetimeoffset](7) NULL,\n\t[EndTime] [datetimeoffset](7) NULL,\n\t[Duration] [int] NULL\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_13": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_12": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [LandNFL].[drive](\n\t[eid] [int] NOT NULL,\n\t[unusedfield2] [varchar](50) NULL,\n\t[drivenumber] [int] NOT NULL,\n\t[posteam] [varchar](50) NULL,\n\t[ydsgained] [varchar](50) NULL,\t\n\t[redzone] [varchar](50) NULL,\t\n\t[postime] [varchar](50) NULL,\n\t[end-yrdln] [varchar](50) NULL,\n\t[end-team] [varchar](50) NULL,\t\n\t[end-qtr] [varchar](50) NULL,\n\t[end-time] [varchar](50) NULL,\n\t[start-yrdln] [varchar](50) NULL,\n\t[start-team] [varchar](50) NULL,\n\t[start-qtr] [varchar](50) NULL,\n\t[start-time] [varchar](50) NULL,\t\n\t[fds] [varchar](50) NULL,\n\t[result] [varchar](50) NULL,\t\n\t[numplays] [varchar](50) NULL,\n\t[qtr] [varchar](50) NULL,\t\n\t[penyds] [varchar](50) NULL,\n CONSTRAINT [PK_drive] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC,\n\t[drivenumber] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_14": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_13": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [LandNFL].[game](\n\t[eid] [int] NOT NULL,\n\t[home-abbr] [varchar](50) NULL,\n\t[home-players] [varchar](50) NULL,\n\t[away-to] [varchar](50) NULL,\n\t[away-score-1] [varchar](50) NULL,\n\t[away-score-2] [varchar](50) NULL,\n\t[away-score-3] [varchar](50) NULL,\n\t[away-score-4] [varchar](50) NULL,\n\t[away-score-5] [varchar](50) NULL,\n\t[away-score-T] [varchar](50) NULL,\n\t[away-stats-team-totfd] [varchar](50) NULL,\n\t[away-stats-team-pt] [varchar](50) NULL,\n\t[away-stats-team-ptyds] [varchar](50) NULL,\n\t[away-stats-team-trnovr] [varchar](50) NULL,\n\t[away-stats-team-pyds] [varchar](50) NULL,\n\t[away-stats-team-ryds] [varchar](50) NULL,\n\t[away-stats-team-totyds] [varchar](50) NULL,\n\t[away-stats-team-ptavg] [varchar](50) NULL,\n\t[away-stats-team-pen] [varchar](50) NULL,\n\t[away-stats-team-penyds] [varchar](50) NULL,\n\t[away-stats-team-top] [varchar](50) NULL,\n\t[away-abbr] [varchar](50) NULL,\n\t[away-players] [varchar](50) NULL,\n\t[home-to] [varchar](50) NULL,\n\t[home-score-1] [varchar](50) NULL,\n\t[home-score-2] [varchar](50) NULL,\n\t[home-score-3] [varchar](50) NULL,\n\t[home-score-4] [varchar](50) NULL,\n\t[home-score-5] [varchar](50) NULL,\n\t[home-score-T] [varchar](50) NULL,\n\t[home-stats-team-totfd] [varchar](50) NULL,\n\t[home-stats-team-pt] [varchar](50) NULL,\n\t[home-stats-team-ptyds] [varchar](50) NULL,\n\t[home-stats-team-trnovr] [varchar](50) NULL,\n\t[home-stats-team-pyds] [varchar](50) NULL,\n\t[home-stats-team-ryds] [varchar](50) NULL,\n\t[home-stats-team-totyds] [varchar](50) NULL,\n\t[home-stats-team-ptavg] [varchar](50) NULL,\n\t[home-stats-team-pen] [varchar](50) NULL,\n\t[home-stats-team-penyds] [varchar](50) NULL,\n\t[home-stats-team-top] [varchar](50) NULL,\n CONSTRAINT [PK_game] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_15": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_14": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [LandNFL].[play](\n\t[eid] [int] NOT NULL,\n\t[unusedfield2] [varchar](50) NULL,\n\t[drivenumber] [int] NOT NULL,\n\t[unusedfield4] [varchar](50) NULL,\n\t[playnumber] [int] NOT NULL,\n\t[posteam] [varchar](50) NULL,\n\t[desc] [varchar](5000) NULL,\n\t[ydstogo] [varchar](50) NULL,\n\t[note] [varchar](50) NULL,\n\t[qtr] [varchar](50) NULL,\n\t[yrdln] [varchar](50) NULL,\n\t[sp] [varchar](50) NULL,\n\t[down] [varchar](50) NULL,\n\t[time] [varchar](50) NULL,\n\t[ydsnet] [varchar](50) NULL,\n CONSTRAINT [PK_pplay] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC,\n\t[drivenumber] ASC,\n\t[playnumber] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_16": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_15": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [LandNFL].[playplayer](\n\t[eid] [int] NOT NULL,\n\t[unusedfield2] [varchar](50) NULL,\n\t[drivenumber] [int] NOT NULL,\n\t[unusedfield4] [varchar](50) NULL,\n\t[playnumber] [int] NOT NULL,\n\t[unusedfield6] [varchar](50) NULL,\n\t[playerid] [varchar](50) NOT NULL,\n\t[statId] [varchar](50) NULL,\n\t[sequence] [varchar](50) NULL,\n\t[playerName] [varchar](50) NULL,\n\t[clubcode] [varchar](50) NULL,\n\t[yards] [varchar](50) NULL,\n CONSTRAINT [PK_pplayplayer] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC,\n\t[drivenumber] ASC,\n\t[playnumber] ASC,\n\t[playerid] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_17": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_16": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [MasterNFL].[drive](\n\t[eid] [int] NOT NULL,\n\t[drivenumber] [int] NOT NULL,\n\t[end-qtr] [varchar](50) NULL,\n\t[end-team] [varchar](50) NULL,\n\t[end-time] [varchar](50) NULL,\n\t[end-yrdln] [varchar](50) NULL,\n\t[fds] [varchar](50) NULL,\n\t[numplays] [varchar](50) NULL,\n\t[penyds] [varchar](50) NULL,\n\t[posteam] [varchar](50) NULL,\n\t[postime] [varchar](50) NULL,\n\t[qtr] [varchar](50) NULL,\n\t[redzone] [varchar](50) NULL,\n\t[result] [varchar](50) NULL,\n\t[start-qtr] [varchar](50) NULL,\n\t[start-team] [varchar](50) NULL,\n\t[start-time] [varchar](50) NULL,\n\t[start-yrdln] [varchar](50) NULL,\n\t[ydsgained] [varchar](50) NULL,\n\t[createts] [datetime] NULL,\n\t[modifyts] [datetime] NULL,\n\t[deletets] [datetime] NULL,\n CONSTRAINT [PK_drive] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC,\n\t[drivenumber] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_18": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_17": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [MasterNFL].[game](\n\t[eid] [int] NOT NULL,\n\t[home-abbr] [varchar](50) NULL,\n\t[home-players] [varchar](50) NULL,\n\t[away-to] [varchar](50) NULL,\n\t[away-score-1] [varchar](50) NULL,\n\t[away-score-2] [varchar](50) NULL,\n\t[away-score-3] [varchar](50) NULL,\n\t[away-score-4] [varchar](50) NULL,\n\t[away-score-5] [varchar](50) NULL,\n\t[away-score-T] [varchar](50) NULL,\n\t[away-stats-team-totfd] [varchar](50) NULL,\n\t[away-stats-team-pt] [varchar](50) NULL,\n\t[away-stats-team-ptyds] [varchar](50) NULL,\n\t[away-stats-team-trnovr] [varchar](50) NULL,\n\t[away-stats-team-pyds] [varchar](50) NULL,\n\t[away-stats-team-ryds] [varchar](50) NULL,\n\t[away-stats-team-totyds] [varchar](50) NULL,\n\t[away-stats-team-ptavg] [varchar](50) NULL,\n\t[away-stats-team-pen] [varchar](50) NULL,\n\t[away-stats-team-penyds] [varchar](50) NULL,\n\t[away-stats-team-top] [varchar](50) NULL,\n\t[away-abbr] [varchar](50) NULL,\n\t[away-players] [varchar](50) NULL,\n\t[home-to] [varchar](50) NULL,\n\t[home-score-1] [varchar](50) NULL,\n\t[home-score-2] [varchar](50) NULL,\n\t[home-score-3] [varchar](50) NULL,\n\t[home-score-4] [varchar](50) NULL,\n\t[home-score-5] [varchar](50) NULL,\n\t[home-score-T] [varchar](50) NULL,\n\t[home-stats-team-totfd] [varchar](50) NULL,\n\t[home-stats-team-pt] [varchar](50) NULL,\n\t[home-stats-team-ptyds] [varchar](50) NULL,\n\t[home-stats-team-trnovr] [varchar](50) NULL,\n\t[home-stats-team-pyds] [varchar](50) NULL,\n\t[home-stats-team-ryds] [varchar](50) NULL,\n\t[home-stats-team-totyds] [varchar](50) NULL,\n\t[home-stats-team-ptavg] [varchar](50) NULL,\n\t[home-stats-team-pen] [varchar](50) NULL,\n\t[home-stats-team-penyds] [varchar](50) NULL,\n\t[home-stats-team-top] [varchar](50) NULL,\n\t[createts] [datetime] NULL,\n\t[modifyts] [datetime] NULL,\n\t[deletets] [datetime] NULL,\n CONSTRAINT [PK_game] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_19": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_18": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [MasterNFL].[play](\n\t[eid] [int] NOT NULL,\n\t[drivenumber] [int] NOT NULL,\n\t[playnumber] [int] NOT NULL,\n\t[posteam] [varchar](50) NULL,\n\t[desc] [varchar](5000) NULL,\n\t[ydstogo] [varchar](50) NULL,\n\t[note] [varchar](50) NULL,\n\t[qtr] [varchar](50) NULL,\n\t[yrdln] [varchar](50) NULL,\n\t[sp] [varchar](50) NULL,\n\t[down] [varchar](50) NULL,\n\t[time] [varchar](50) NULL,\n\t[ydsnet] [varchar](50) NULL,\n\t[createts] [datetime] NULL,\n\t[modifyts] [datetime] NULL,\n\t[deletets] [datetime] NULL,\n CONSTRAINT [PK_pplay] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC,\n\t[drivenumber] ASC,\n\t[playnumber] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_2": {
+                            "runAfter": {
+                                "Execute_a_SQL_query": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE SCHEMA [NFLDB]"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_20": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_19": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [MasterNFL].[playplayer](\n\t[eid] [int] NOT NULL,\n\t[drivenumber] [int] NOT NULL,\n\t[playnumber] [int] NOT NULL,\n\t[playerid] [varchar](50) NOT NULL,\n\t[statId] [varchar](50) NULL,\n\t[sequence] [varchar](50) NULL,\n\t[playerName] [varchar](50) NULL,\n\t[clubcode] [varchar](50) NULL,\n\t[yards] [varchar](50) NULL,\n\t[createts] [datetime] NULL,\n\t[modifyts] [datetime] NULL,\n\t[deletets] [datetime] NULL,\n CONSTRAINT [PK_pplayplayer] PRIMARY KEY CLUSTERED \n(\n\t[eid] ASC,\n\t[drivenumber] ASC,\n\t[playnumber] ASC,\n\t[playerid] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_21": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_20": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [NFLDB].[Schedule](\n\t[ScheduleKey] [int] IDENTITY(1,1) NOT NULL,\n\t[GameID] [int] NOT NULL,\n\t[SeasonYear] [smallint] NULL,\n\t[SeasonType] [varchar](4) NULL,\n\t[SeasonTypeDetail] [varchar](4) NULL,\n\t[WkNumber] [smallint] NULL,\n\t[DayName] [varchar](3) NULL,\n\t[GameTime] [time](7) NULL,\n\t[GameTimeUTC] [time](7) NULL,\n\t[Qtr] [varchar](1) NULL,\n\t[HomeTeam] [varchar](8) NULL,\n\t[HomeTeamName] [varchar](32) NULL,\n\t[AwayTeam] [varchar](8) NULL,\n\t[AwayTeamName] [varchar](32) NULL,\n CONSTRAINT [PK_Schedule_1] PRIMARY KEY CLUSTERED \n(\n\t[ScheduleKey] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_22": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_21": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [NFLDB].[ScheduleDefinition](\n\t[ScheduleDefinitionKey] [int] IDENTITY(1,1) NOT NULL,\n\t[Week] [int] NOT NULL,\n\t[SeasonType] [varchar](4) NOT NULL,\n\t[DESCRIPTION] [varchar](20) NOT NULL,\n CONSTRAINT [PK_ScheduleDefinition] PRIMARY KEY CLUSTERED \n(\n\t[ScheduleDefinitionKey] ASC\n)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON)\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_23": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_22": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [dbo].[bulkloaddrive] @filePath nvarchar(100) = NULL, @fileName nvarchar(100) = NULL, @eid nvarchar(12) = NULL\n\nAS\n--Delete all where same records exsit \nDECLARE @bulkcmd AS VARCHAR(max)\n\nSET @bulkcmd = \n'DELETE FROM LandNFL.drive where eid='''+@eid+''';\nBULK INSERT LandNFL.drive\nFROM '''+ @filePath +  @fileName + '''\nWITH(\n        DATA_SOURCE = ''nflgenstorage'',\n\t\tFORMAT=''CSV'',\n\t\tFIELDTERMINATOR='','',\n\t\tROWTERMINATOR=''\\n''\n    );'\n\nEXEC (@bulkcmd)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_24": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_23": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [dbo].[bulkloaddrive_old] @filePath nvarchar(100) = NULL, @fileName nvarchar(100) = NULL\n\nAS\n--Delete all where same records exsit \nDECLARE @bulkcmd AS VARCHAR(max)\n\nSET @bulkcmd = \n'BULK INSERT LandNFL.drive\nFROM '''+ @filePath +  @fileName + '''\nWITH(\n        DATA_SOURCE = ''nflgenstorage'',\n\t\tFIRSTROW = 4,\n\t\tFORMAT=''CSV'',\n\t\tFIELDTERMINATOR='','',\n\t\tROWTERMINATOR=''\\n''\n    );'\n\nEXEC (@bulkcmd)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_25": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_24": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [dbo].[bulkloadgame] @filePath nvarchar(100) = NULL, @fileName nvarchar(100) = NULL, @eid nvarchar(12) = NULL\n\nAS\n--Delete all where same records exsit \nDECLARE @bulkcmd AS VARCHAR(max)\n\nSET @bulkcmd = \n'DELETE FROM LandNFL.game where eid='''+@eid+''';\nBULK INSERT LandNFL.game\nFROM '''+ @filePath +  @fileName + '''\nWITH(\n        DATA_SOURCE = ''nflgenstorage'',\n\t\tFORMAT=''CSV'',\n\t\tFIELDTERMINATOR='','',\n\t\tROWTERMINATOR=''\\n''\n    );'\n\nEXEC (@bulkcmd)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_26": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_25": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [dbo].[bulkloadplay] @filePath nvarchar(100) = NULL, @fileName nvarchar(100) = NULL, @eid nvarchar(100) = NULL\n\nAS\n--Delete all where same records exsit \nDECLARE @bulkcmd AS VARCHAR(max)\n\nSET @bulkcmd = \n'DELETE FROM LandNFL.play where eid='''+@eid+''';\nBULK INSERT LandNFL.play\nFROM '''+ @filePath +  @fileName + '''\nWITH(\n        DATA_SOURCE = ''nflgenstorage'',\n\t\tFORMAT=''CSV'',\n\t\tFIELDTERMINATOR='','',\n\t\tROWTERMINATOR=''\\n''\n    );'\n\nEXEC (@bulkcmd)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_27": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_26": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [dbo].[bulkloadplayplayer] @filePath nvarchar(100) = NULL, @fileName nvarchar(100) = NULL, @eid nvarchar(12) = NULL\n\nAS\n--Delete all where same records exsit \nDECLARE @bulkcmd AS VARCHAR(max)\n\nSET @bulkcmd = \n'DELETE FROM LandNFL.playplayer where eid='''+@eid+''';\nBULK INSERT LandNFL.playplayer\nFROM '''+ @filePath +  @fileName + '''\nWITH(\n        DATA_SOURCE = ''nflgenstorage'',\n\t\tFORMAT=''CSV'',\n\t\tFIELDTERMINATOR='','',\n\t\tROWTERMINATOR=''\\n''\n    );'\n\nEXEC (@bulkcmd)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_28": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_27": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROCEDURE [dbo].[LogProcedure]\n\n@ProcID INT = NULL,\n@TableName nvarchar(256) = NULL,\n@RowCount INT = NULL,\n@insert INT = NULL,\n@update INT = NULL,\n@delete INT = NULL,\n@starttime DATETIMEOFFSET = NULL,\n@isStart BIT = 1\n\n\nAS\n\nBEGIN\n\n    SET NOCOUNT ON;\n\n    DECLARE @EndTime DATETIMEOFFSET;\n    SET @EndTime = GETDATE();\n\n    DECLARE @Duration INT;\n    SET @Duration = DATEDIFF(SECOND, @starttime, @EndTime);\n\n\tDECLARE @ProcName NVARCHAR(300) = OBJECT_NAME(@ProcID),\n\t@SchemaName NVARCHAR(300)= OBJECT_SCHEMA_NAME(@ProcID);\n\n\tDECLARE @ProcessName NVARCHAR(300) = CASE WHEN @ProcName LIKE 'writelogproctest' THEN 'Test Proc'\n\t\t\t\t\t\t\t\t\t\t\t  WHEN @ProcName LIKE 'CDCProcess%'  THEN 'CDC'\n\t\t\t\t\t\t\t\t\t\t\t  WHEN @ProcName LIKE 'Process%' THEN 'Merge'\n\t\t\t\t\t\t\t\t\t\t\t  ELSE 'Unknown'\n\t\t\t\t\t\t\t\t\t\t\t  END\n\t\t\t\t\t\t\t\t\t\t\t\t\n\n    IF @isStart = 1\n    BEGIN\n        INSERT INTO dbo.ProcedureLog\n        (\n            ProcedureName,\n            ProcessName,\n            SchemaName,\n            TableName,\n            StartTime\n        )\n        VALUES\n        (   @ProcName,\n            @ProcessName, \n            @SchemaName, \n            @TableName,\n            @starttime\n        );\n\n    END;\n\n    IF @isStart = 0\n    BEGIN\n        UPDATE dbo.ProcedureLog\n        SET RecordsReceived = @RowCount,\n            RecordsInserted = @insert,\n            RecordsUpdated = @update,\n            RecordsDeleted = @delete,\n            EndTime = @EndTime,\n            Duration = @Duration\n        WHERE ProcedureName = @ProcName\n              AND StartTime = @starttime;\n    END;\n\nEND;"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_29": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_28": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [dbo].[sp_generate_merge]\n(\n @table_name varchar(776), -- The table/view for which the MERGE statement will be generated using the existing data\n @target_table varchar(776) = NULL, -- Use this parameter to specify a different table name into which the data will be inserted/updated/deleted\n @from varchar(800) = NULL, -- Use this parameter to filter the rows based on a filter condition (using WHERE)\n @include_timestamp bit = 0, -- Specify 1 for this parameter, if you want to include the TIMESTAMP/ROWVERSION column's data in the MERGE statement\n @debug_mode bit = 0, -- If @debug_mode is set to 1, the SQL statements constructed by this procedure will be printed for later examination\n @schema varchar(64) = NULL, -- Use this parameter if you are not the owner of the table\n @srcSchema VARCHAR(64) = NULL,\t-- source schema for merge \n @ommit_images bit = 0, -- Use this parameter to generate MERGE statement by omitting the 'image' columns\n @ommit_identity bit = 0, -- Use this parameter to ommit the identity columns\n @top int = NULL, -- Use this parameter to generate a MERGE statement only for the TOP n rows\n @cols_to_include varchar(8000) = NULL, -- List of columns to be included in the MERGE statement\n @cols_to_exclude varchar(8000) = NULL, -- List of columns to be excluded from the MERGE statement\n @update_only_if_changed bit = 1, -- When 1, only performs an UPDATE operation if an included column in a matched row has changed.\n @delete_if_not_matched bit = 1, -- When 1, deletes unmatched source rows from target, when 0 source rows will only be used to update existing rows or insert new.\n @disable_constraints bit = 0, -- When 1, disables foreign key constraints and enables them after the MERGE statement\n @ommit_computed_cols bit = 0, -- When 1, computed columns will not be included in the MERGE statement\n @include_use_db bit = 1, -- When 1, includes a USE [DatabaseName] statement at the beginning of the generated batch\n @results_to_text bit = 0, -- When 1, outputs results to grid/messages window. When 0, outputs MERGE statement in an XML fragment.\n @include_rowsaffected bit = 1, -- When 1, a section is added to the end of the batch which outputs rows affected by the MERGE\n @nologo bit = 0, -- When 1, the \"About\" comment is suppressed from output\n @batch_separator VARCHAR(50) = ';' -- Batch separator to use\n)\nAS\nBEGIN\n\n\nSET NOCOUNT ON\n\n\n--Making sure user only uses either @cols_to_include or @cols_to_exclude\nIF ((@cols_to_include IS NOT NULL) AND (@cols_to_exclude IS NOT NULL))\n BEGIN\n RAISERROR('Use either @cols_to_include or @cols_to_exclude. Do not use both the parameters at once',16,1)\n RETURN -1 --Failure. Reason: Both @cols_to_include and @cols_to_exclude parameters are specified\n END\n\n\n--Making sure the @cols_to_include and @cols_to_exclude parameters are receiving values in proper format\nIF ((@cols_to_include IS NOT NULL) AND (PATINDEX('''%''',@cols_to_include) = 0))\n BEGIN\n RAISERROR('Invalid use of @cols_to_include property',16,1)\n PRINT 'Specify column names surrounded by single quotes and separated by commas'\n PRINT 'Eg: EXEC sp_generate_merge titles, @cols_to_include = \"''title_id'',''title''\"'\n RETURN -1 --Failure. Reason: Invalid use of @cols_to_include property\n END\n\nIF ((@cols_to_exclude IS NOT NULL) AND (PATINDEX('''%''',@cols_to_exclude) = 0))\n BEGIN\n RAISERROR('Invalid use of @cols_to_exclude property',16,1)\n PRINT 'Specify column names surrounded by single quotes and separated by commas'\n PRINT 'Eg: EXEC sp_generate_merge titles, @cols_to_exclude = \"''title_id'',''title''\"'\n RETURN -1 --Failure. Reason: Invalid use of @cols_to_exclude property\n END\n\n\n--Checking to see if the database name is specified along wih the table name\n--Your database context should be local to the table for which you want to generate a MERGE statement\n--specifying the database name is not allowed\nIF (PARSENAME(@table_name,3)) IS NOT NULL\n BEGIN\n RAISERROR('Do not specify the database name. Be in the required database and just specify the table name.',16,1)\n RETURN -1 --Failure. Reason: Database name is specified along with the table name, which is not allowed\n END\n\n\n--Checking for the existence of 'user table' or 'view'\n--This procedure is not written to work on system tables\n--To script the data in system tables, just create a view on the system tables and script the view instead\nIF @schema IS NULL\n BEGIN\n IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @table_name AND (TABLE_TYPE = 'BASE TABLE' OR TABLE_TYPE = 'VIEW') AND TABLE_SCHEMA = SCHEMA_NAME())\n BEGIN\n RAISERROR('User table or view not found.',16,1)\n PRINT 'You may see this error if the specified table is not in your default schema (' + SCHEMA_NAME() + '). In that case use @schema parameter to specify the schema name.'\n PRINT 'Make sure you have SELECT permission on that table or view.'\n RETURN -1 --Failure. Reason: There is no user table or view with this name\n END\n END\nELSE\n BEGIN\n IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @table_name AND (TABLE_TYPE = 'BASE TABLE' OR TABLE_TYPE = 'VIEW') AND TABLE_SCHEMA = @schema)\n BEGIN\n RAISERROR('User table or view not found.',16,1)\n PRINT 'Make sure you have SELECT permission on that table or view.'\n RETURN -1 --Failure. Reason: There is no user table or view with this name \n END\n END\n\n\n--Variable declarations\nDECLARE @Column_ID int, \n @Column_List varchar(max), \n @Column_List_For_Update varchar(max), \n @Column_List_For_Check varchar(max), \n @Column_Name varchar(128), \n @Column_Name_Unquoted varchar(128), \n @Data_Type varchar(128), \n @Actual_Values nvarchar(max), --This is the string that will be finally executed to generate a MERGE statement\n @IDN varchar(128), --Will contain the IDENTITY column's name in the table\n @Target_Table_For_Output varchar(776),\n @Source_Table_Qualified varchar(776)\n \n \n\n--Variable Initialization\nSET @IDN = ''\nSET @Column_ID = 0\nSET @Column_Name = ''\nSET @Column_Name_Unquoted = ''\nSET @Column_List = ''\nSET @Column_List_For_Update = ''\nSET @Column_List_For_Check = ''\nSET @Actual_Values = ''\n\n--Variable Defaults\nIF @schema IS NULL\n BEGIN\n SET @Target_Table_For_Output = QUOTENAME(COALESCE(@target_table, @table_name))\n END\nELSE\n BEGIN\n SET @Target_Table_For_Output = QUOTENAME(@schema) + '.' + QUOTENAME(COALESCE(@target_table, @table_name))\n END\n\nSET @Source_Table_Qualified\n\n = QUOTENAME(COALESCE(@srcSchema,SCHEMA_NAME())) + '.' + QUOTENAME(@table_name)\n\n--To get the first column's ID\nSELECT @Column_ID = MIN(ORDINAL_POSITION) \nFROM INFORMATION_SCHEMA.COLUMNS (NOLOCK) \nWHERE TABLE_NAME = @table_name\nAND TABLE_SCHEMA = COALESCE(@schema, SCHEMA_NAME())\n\n\n--Loop through all the columns of the table, to get the column names and their data types\nWHILE @Column_ID IS NOT NULL\n BEGIN\n SELECT @Column_Name = QUOTENAME(COLUMN_NAME), \n @Column_Name_Unquoted = COLUMN_NAME,\n @Data_Type = DATA_TYPE \n FROM INFORMATION_SCHEMA.COLUMNS (NOLOCK) \n WHERE ORDINAL_POSITION = @Column_ID\n AND TABLE_NAME = @table_name\n AND TABLE_SCHEMA = COALESCE(@schema, SCHEMA_NAME())\n\n IF @cols_to_include IS NOT NULL --Selecting only user specified columns\n BEGIN\n IF CHARINDEX( '''' + SUBSTRING(@Column_Name,2,LEN(@Column_Name)-2) + '''',@cols_to_include) = 0 \n BEGIN\n GOTO SKIP_LOOP\n END\n END\n\n IF @cols_to_exclude IS NOT NULL --Selecting only user specified columns\n BEGIN\n IF CHARINDEX( '''' + SUBSTRING(@Column_Name,2,LEN(@Column_Name)-2) + '''',@cols_to_exclude) <> 0 \n BEGIN\n GOTO SKIP_LOOP\n END\n END\n\n --Making sure to output SET IDENTITY_INSERT ON/OFF in case the table has an IDENTITY column\n IF (SELECT COLUMNPROPERTY( OBJECT_ID(@Source_Table_Qualified),SUBSTRING(@Column_Name,2,LEN(@Column_Name) - 2),'IsIdentity')) = 1 \n BEGIN\n IF @ommit_identity = 0 --Determing whether to include or exclude the IDENTITY column\n SET @IDN = @Column_Name\n ELSE\n GOTO SKIP_LOOP \n END\n \n --Making sure whether to output computed columns or not\n IF @ommit_computed_cols = 1\n BEGIN\n IF (SELECT COLUMNPROPERTY( OBJECT_ID(@Source_Table_Qualified),SUBSTRING(@Column_Name,2,LEN(@Column_Name) - 2),'IsComputed')) = 1 \n BEGIN\n GOTO SKIP_LOOP \n END\n END\n \n --Tables with columns of IMAGE data type are not supported for obvious reasons\n IF(@Data_Type in ('image'))\n BEGIN\n IF (@ommit_images = 0)\n BEGIN\n RAISERROR('Tables with image columns are not supported.',16,1)\n PRINT 'Use @ommit_images = 1 parameter to generate a MERGE for the rest of the columns.'\n RETURN -1 --Failure. Reason: There is a column with image data type\n END\n ELSE\n BEGIN\n GOTO SKIP_LOOP\n END\n END\n\n --Determining the data type of the column and depending on the data type, the VALUES part of\n --the MERGE statement is generated. Care is taken to handle columns with NULL values. Also\n --making sure, not to lose any data from flot, real, money, smallmomey, datetime columns\n SET @Actual_Values = @Actual_Values +\n CASE \n WHEN @Data_Type IN ('char','nchar') \n THEN \n 'COALESCE(''N'''''' + REPLACE(RTRIM(' + @Column_Name + '),'''''''','''''''''''')+'''''''',''NULL'')'\n WHEN @Data_Type IN ('varchar','nvarchar') \n THEN \n 'COALESCE(''N'''''' + REPLACE(' + @Column_Name + ','''''''','''''''''''')+'''''''',''NULL'')'\n WHEN @Data_Type IN ('datetime','smalldatetime','datetime2','date') \n THEN \n 'COALESCE('''''''' + RTRIM(CONVERT(char,' + @Column_Name + ',127))+'''''''',''NULL'')'\n WHEN @Data_Type IN ('uniqueidentifier') \n THEN \n 'COALESCE(''N'''''' + REPLACE(CONVERT(char(36),RTRIM(' + @Column_Name + ')),'''''''','''''''''''')+'''''''',''NULL'')'\n WHEN @Data_Type IN ('text') \n THEN \n 'COALESCE(''N'''''' + REPLACE(CONVERT(varchar(max),' + @Column_Name + '),'''''''','''''''''''')+'''''''',''NULL'')' \n WHEN @Data_Type IN ('ntext') \n THEN \n 'COALESCE('''''''' + REPLACE(CONVERT(nvarchar(max),' + @Column_Name + '),'''''''','''''''''''')+'''''''',''NULL'')' \n WHEN @Data_Type IN ('xml') \n THEN \n 'COALESCE('''''''' + REPLACE(CONVERT(nvarchar(max),' + @Column_Name + '),'''''''','''''''''''')+'''''''',''NULL'')' \n WHEN @Data_Type IN ('binary','varbinary') \n THEN \n 'COALESCE(RTRIM(CONVERT(varchar(max),' + @Column_Name + ', 1))),''NULL'')' \n WHEN @Data_Type IN ('timestamp','rowversion') \n THEN \n CASE \n WHEN @include_timestamp = 0 \n THEN \n '''DEFAULT''' \n ELSE \n 'COALESCE(RTRIM(CONVERT(char,' + 'CONVERT(int,' + @Column_Name + '))),''NULL'')' \n END\n WHEN @Data_Type IN ('float','real','money','smallmoney')\n THEN\n 'COALESCE(LTRIM(RTRIM(' + 'CONVERT(char, ' + @Column_Name + ',2)' + ')),''NULL'')' \n WHEN @Data_Type IN ('hierarchyid')\n THEN \n  'COALESCE(''hierarchyid::Parse(''+'''''''' + LTRIM(RTRIM(' + 'CONVERT(char, ' + @Column_Name + ')' + '))+''''''''+'')'',''NULL'')' \n ELSE \n 'COALESCE(LTRIM(RTRIM(' + 'CONVERT(char, ' + @Column_Name + ')' + ')),''NULL'')' \n END + '+' + ''',''' + ' + '\n \n --Generating the column list for the MERGE statement\n SET @Column_List = @Column_List + @Column_Name + ',' \n \n --Don't update Primary Key or Identity columns\n IF NOT EXISTS(\n SELECT 1\n FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS pk ,\n INFORMATION_SCHEMA.KEY_COLUMN_USAGE c\n WHERE pk.TABLE_NAME = @table_name\n AND pk.TABLE_SCHEMA = COALESCE(@schema, SCHEMA_NAME())\n AND CONSTRAINT_TYPE = 'PRIMARY KEY'\n AND c.TABLE_NAME = pk.TABLE_NAME\n AND c.TABLE_SCHEMA = pk.TABLE_SCHEMA\n AND c.CONSTRAINT_NAME = pk.CONSTRAINT_NAME\n AND c.COLUMN_NAME = @Column_Name_Unquoted \n )\n BEGIN\n SET @Column_List_For_Update = @Column_List_For_Update + @Column_Name + ' = Source.' + @Column_Name + ', \n  ' \n SET @Column_List_For_Check = @Column_List_For_Check +\n CASE @Data_Type \n WHEN 'text' THEN CHAR(10) + CHAR(9) + 'NULLIF(CAST(Source.' + @Column_Name + ' AS VARCHAR(MAX)), CAST(Target.' + @Column_Name + ' AS VARCHAR(MAX))) IS NOT NULL OR NULLIF(CAST(Target.' + @Column_Name + ' AS VARCHAR(MAX)), CAST(Source.' + @Column_Name + ' AS VARCHAR(MAX))) IS NOT NULL OR '\n WHEN 'ntext' THEN CHAR(10) + CHAR(9) + 'NULLIF(CAST(Source.' + @Column_Name + ' AS NVARCHAR(MAX)), CAST(Target.' + @Column_Name + ' AS NVARCHAR(MAX))) IS NOT NULL OR NULLIF(CAST(Target.' + @Column_Name + ' AS NVARCHAR(MAX)), CAST(Source.' + @Column_Name + ' AS NVARCHAR(MAX))) IS NOT NULL OR ' \n ELSE CHAR(10) + CHAR(9) + 'NULLIF(Source.' + @Column_Name + ', Target.' + @Column_Name + ') IS NOT NULL OR NULLIF(Target.' + @Column_Name + ', Source.' + @Column_Name + ') IS NOT NULL OR '\n END \n END\n\n SKIP_LOOP: --The label used in GOTO\n\n SELECT @Column_ID = MIN(ORDINAL_POSITION) \n FROM INFORMATION_SCHEMA.COLUMNS (NOLOCK) \n WHERE TABLE_NAME = @table_name\n AND TABLE_SCHEMA = COALESCE(@schema, SCHEMA_NAME())\n AND ORDINAL_POSITION > @Column_ID\n\n END --Loop ends here!\n\n\n--To get rid of the extra characters that got concatenated during the last run through the loop\nIF LEN(@Column_List_For_Update) <> 0\n BEGIN\n SET @Column_List_For_Update = ' ' + LEFT(@Column_List_For_Update,len(@Column_List_For_Update) - 4)\n END\n\nIF LEN(@Column_List_For_Check) <> 0\n BEGIN\n SET @Column_List_For_Check = LEFT(@Column_List_For_Check,len(@Column_List_For_Check) - 3)\n END\n\nSET @Actual_Values = LEFT(@Actual_Values,len(@Actual_Values) - 6)\n\nSET @Column_List = LEFT(@Column_List,len(@Column_List) - 1)\nIF LEN(LTRIM(@Column_List)) = 0\n BEGIN\n RAISERROR('No columns to select. There should at least be one column to generate the output',16,1)\n RETURN -1 --Failure. Reason: Looks like all the columns are ommitted using the @cols_to_exclude parameter\n END\n\n\n--Get the join columns ----------------------------------------------------------\nDECLARE @PK_column_list VARCHAR(8000)\nDECLARE @PK_column_joins VARCHAR(8000)\nSET @PK_column_list = ''\nSET @PK_column_joins = ''\n\nSELECT @PK_column_list = @PK_column_list + '[' + c.COLUMN_NAME + '], '\n, @PK_column_joins = @PK_column_joins + 'Target.[' + c.COLUMN_NAME + '] = Source.[' + c.COLUMN_NAME + '] AND '\nFROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS pk ,\nINFORMATION_SCHEMA.KEY_COLUMN_USAGE c\nWHERE pk.TABLE_NAME = @table_name\nAND pk.TABLE_SCHEMA = COALESCE(@schema, SCHEMA_NAME())\nAND CONSTRAINT_TYPE = 'PRIMARY KEY'\nAND c.TABLE_NAME = pk.TABLE_NAME\nAND c.TABLE_SCHEMA = pk.TABLE_SCHEMA\nAND c.CONSTRAINT_NAME = pk.CONSTRAINT_NAME\n\nIF IsNull(@PK_column_list, '') = '' \n BEGIN\n RAISERROR('Table has no primary keys. There should at least be one column in order to have a valid join.',16,1)\n RETURN -1 --Failure. Reason: looks like table doesn't have any primary keys\n END\n\nSET @PK_column_list = LEFT(@PK_column_list, LEN(@PK_column_list) -1)\nSET @PK_column_joins = LEFT(@PK_column_joins, LEN(@PK_column_joins) -4)\n\n\n--Forming the final string that will be executed, to output the a MERGE statement\nSET @Actual_Values = \n 'SELECT ' + \n CASE WHEN @top IS NULL OR @top < 0 THEN '' ELSE ' TOP ' + LTRIM(STR(@top)) + ' ' END + \n '''' + \n ' '' + CASE WHEN ROW_NUMBER() OVER (ORDER BY ' + @PK_column_list + ') = 1 THEN '' '' ELSE '','' END + ''(''+ ' + @Actual_Values + '+'')''' + ' ' + \n COALESCE(@from,' FROM ' + @Source_Table_Qualified + ' (NOLOCK) ORDER BY ' + @PK_column_list)\n\n DECLARE @output VARCHAR(MAX) = ''\n DECLARE @b CHAR(1) = CHAR(13)\n\n--Determining whether to ouput any debug information\nIF @debug_mode =1\n BEGIN\n SET @output += @b + '/*****START OF DEBUG INFORMATION*****'\n SET @output += @b + ''\n SET @output += @b + 'The primary key column list:'\n SET @output += @b + @PK_column_list\n SET @output += @b + ''\n SET @output += @b + 'The INSERT column list:'\n SET @output += @b + @Column_List\n SET @output += @b + ''\n SET @output += @b + 'The UPDATE column list:'\n SET @output += @b + @Column_List_For_Update\n SET @output += @b + ''\n SET @output += @b + 'The SELECT statement executed to generate the MERGE:'\n SET @output += @b + @Actual_Values\n SET @output += @b + ''\n SET @output += @b + '*****END OF DEBUG INFORMATION*****/'\n SET @output += @b + ''\n END\n \nIF (@include_use_db = 1)\nBEGIN\n\tSET @output +=      'USE ' + DB_NAME()\n\tSET @output += @b + @batch_separator\n\tSET @output += @b + @b\nEND\n\nIF (@nologo = 0)\nBEGIN\n SET @output += @b + '--MERGE generated by ''sp_generate_merge'' stored procedure, Version 0.93'\n SET @output += @b + '--Originally by Vyas (http://vyaskn.tripod.com): sp_generate_inserts (build 22)'\n SET @output += @b + '--Adapted for SQL Server 2008/2012 by Daniel Nolan (http://danere.com)'\n SET @output += @b + ''\nEND\n\nIF (@include_rowsaffected = 1) -- If the caller has elected not to include the \"rows affected\" section, let MERGE output the row count as it is executed.\n SET @output += @b + 'SET NOCOUNT ON'\n SET @output += @b + ''\n\n\n--Determining whether to print IDENTITY_INSERT or not\nIF (LEN(@IDN) <> 0)\n BEGIN\n SET @output += @b + 'SET IDENTITY_INSERT ' + @Target_Table_For_Output + ' ON'\n SET @output += @b + ''\n END\n\n\n--Temporarily disable constraints on the target table\nIF @disable_constraints = 1 AND (OBJECT_ID(@Source_Table_Qualified, 'U') IS NOT NULL)\n BEGIN\n SET @output += @b + 'ALTER TABLE ' + @Target_Table_For_Output + ' NOCHECK CONSTRAINT ALL' --Code to disable constraints temporarily\n END\n\n\n--Add record keeping timestamps to statement \nSET @output += @b + 'DECLARE @SummaryOfChanges TABLE(Change VARCHAR(20));' \nSET @output += @b + 'DECLARE @datetime DATETIMEOFFSET = GETDATE(); '\n\n-- Write start to log \nSET @output += @b + 'EXEC dbo.LogProcedure @ProcID =  @@PROCID, @TableName = '''+ @Target_Table_For_Output +''', @starttime = @datetime, @isStart = true'\nSET @output += @b + @batch_separator\n\n--Output the start of the MERGE statement, qualifying with the schema name only if the caller explicitly specified it\nSET @output += @b + 'MERGE INTO ' + @Target_Table_For_Output + ' AS Target'\nSET @output += @b + 'USING  ( '--VALUES'\nSET @output += @b + 'Select ' + @Column_List \nSET @output += @b + ' From' + @Source_Table_Qualified\n\n--All the hard work pays off here!!! You'll get your MERGE statement, when the next line executes!\n--DECLARE @tab TABLE (ID INT NOT NULL PRIMARY KEY IDENTITY(1,1), val NVARCHAR(max));\n--INSERT INTO @tab (val)\n--EXEC (@Actual_Values)\n\n--IF (SELECT COUNT(*) FROM @tab) <> 0 -- Ensure that rows were returned, otherwise the MERGE statement will get nullified.\n--BEGIN\n-- SET @output += CAST((SELECT @b + val FROM @tab ORDER BY ID FOR XML PATH('')) AS XML).value('.', 'VARCHAR(MAX)');\n--END\n\n\n--Output the columns to correspond with each of the values above--------------------\nSET @output += @b + ') AS Source (' + @Column_List + ')'\n\n\n--Output the join columns ----------------------------------------------------------\nSET @output += @b + 'ON (' + @PK_column_joins + ')'\n\n\n--When matched, perform an UPDATE on any metadata columns only (ie. not on PK)------\nIF LEN(@Column_List_For_Update) <> 0\nBEGIN\n SET @output += @b + 'WHEN MATCHED ' + CASE WHEN @update_only_if_changed = 1 THEN 'AND (' + @Column_List_For_Check + ' OR ' ELSE '' END \n SET @output += @b + '  Target.deletets IS NOT NULL) THEN'\n SET @output += @b + ' UPDATE SET'\n SET @output += @b + '  ' + LTRIM(@Column_List_For_Update) + ','\n SET @output += @b + '   [modifyts] = @datetime,'\n SET @output += @b + '    deletets = NULL ' \nEND\n\n\n--When NOT matched by target, perform an INSERT------------------------------------\nSET @output += @b + 'WHEN NOT MATCHED BY TARGET THEN';\nSET @output += @b + ' INSERT(' + @Column_List + ',[createts],[modifyts],[deletets])'\nSET @output += @b + ' VALUES(' + REPLACE(@Column_List, '[', 'Source.[') + ',@datetime,@datetime,NULL)'\n\n\n--When NOT matched by source, DELETE the row\nIF @delete_if_not_matched=1 BEGIN\n SET @output += @b + 'WHEN NOT MATCHED BY SOURCE AND Target.deletets IS NULL AND Target.eid IN  (SELECT DISTINCT eid FROM ' +  @Source_Table_Qualified   +')  THEN  '\n --SET @output += @b + ' DELETE'\n SET @output += @b + '  UPDATE SET\tdeletets = @datetime'\n SET @output += @b + 'OUTPUT $action INTO @SummaryOfChanges'\nEND;\n--SET @output += @b + ';'\nSET @output += @b + @batch_separator\n\n--Display the number of affected rows to the user, or report if an error occurred---\nIF @include_rowsaffected = 1\nBEGIN\n SET @output += @b + 'DECLARE @mergeError int'\n SET @output += @b + ' , @mergeCount int'\n SET @output += @b + 'SELECT @mergeError = @@ERROR, @mergeCount = @@ROWCOUNT'\n SET @output += @b + 'IF @mergeError != 0'\n SET @output += @b + ' BEGIN'\n SET @output += @b + ' PRINT ''ERROR OCCURRED IN MERGE FOR ' + @Target_Table_For_Output + '. Rows affected: '' + CAST(@mergeCount AS VARCHAR(100)); -- SQL should always return zero rows affected';\n SET @output += @b + ' END'\n SET @output += @b + 'ELSE'\n SET @output += @b + ' BEGIN'\n SET @output += @b + ' PRINT ''' + @Target_Table_For_Output + ' rows affected by MERGE: '' + CAST(@mergeCount AS VARCHAR(100));';\n SET @output += @b + ' END'\n SET @output += @b + @batch_separator\n SET @output += @b + @b\nEND\n\n--Log end and results---\n SET @output += @b + 'DECLARE @rowcount int = @mergeCount, '\n SET @output += @b + '\t\t@insert INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = ''INSERT''), '\n SET @output += @b + '\t\t@update INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = ''update''), '\n SET @output += @b + '\t\t@delete INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = ''DELETE'')  '\n SET @output += @b + ' EXEC dbo.LogProcedure @ProcID = @@PROCID, @RowCount = @rowcount,@insert = @insert,@update = @update, @delete = @delete, @starttime = @datetime, @isStart = false'\n\n SET @output += @b + @batch_separator\n SET @output += @b + @b\n\n--Re-enable the previously disabled constraints-------------------------------------\nIF @disable_constraints = 1 AND (OBJECT_ID(@Source_Table_Qualified, 'U') IS NOT NULL)\n BEGIN\n SET @output +=      'ALTER TABLE ' + @Target_Table_For_Output + ' CHECK CONSTRAINT ALL' --Code to enable the previously disabled constraints\n SET @output += @b + @batch_separator\n SET @output += @b\n END\n\n\n--Switch-off identity inserting------------------------------------------------------\nIF (LEN(@IDN) <> 0)\n BEGIN\n SET @output +=      'SET IDENTITY_INSERT ' + @Target_Table_For_Output + ' OFF'\n SET @output += @b + @batch_separator\n SET @output += @b\n END\n\nIF (@include_rowsaffected = 1)\nBEGIN\n SET @output +=      'SET NOCOUNT OFF'\n SET @output += @b + @batch_separator\n SET @output += @b\nEND\n\nSET @output += @b + ''\nSET @output += @b + ''\n\nIF @results_to_text = 1\nBEGIN\n\t--output the statement to the Grid/Messages tab\n\tSELECT @output;\nEND\nELSE\nBEGIN\n\t--output the statement as xml (to overcome SSMS 4000/8000 char limitation)\n\tSELECT [processing-instruction(x)]=@output FOR XML PATH(''),TYPE;\n\tPRINT 'MERGE statement has been wrapped in an XML fragment and output successfully.'\n\tPRINT 'Ensure you have Results to Grid enabled and then click the hyperlink to copy the statement within the fragment.'\n\tPRINT ''\n\tPRINT 'If you would prefer to have results output directly (without XML) specify @results_to_text = 1, however please'\n\tPRINT 'note that the results may be truncated by your SQL client to 4000 nchars.'\nEND\n\nSET NOCOUNT OFF\nRETURN 0 --Success. We are done!\nEND"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_3": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_2": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE SCHEMA [LandNFL]"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_30": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_29": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC  [LandNFL].[TruncateTables]\n AS \nTRUNCATE TABLE LandNFL.drive\nTRUNCATE TABLE LandNFL.game\nTRUNCATE TABLE LandNFL.play\nTRUNCATE TABLE LandNFL.playplayer"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_31": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_30": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [MasterNFL].[CDCDrive]\nas\n\nSET NOCOUNT ON\n\nDECLARE @SummaryOfChanges TABLE(Change VARCHAR(20));\nDECLARE @datetime DATETIMEOFFSET = GETDATE(); \nEXEC dbo.LogProcedure @ProcID =  @@PROCID, @TableName = '[MasterNFL].[game]', @starttime = @datetime, @isStart = true\n;\nMERGE INTO [MasterNFL].[game] AS Target\nUSING  ( \nSelect [eid],[home-abbr],[home-players],[away-to],[away-score-1],[away-score-2],[away-score-3],[away-score-4],[away-score-5],[away-score-T],[away-stats-team-totfd],[away-stats-team-pt],[away-stats-team-ptyds],[away-stats-team-trnovr],[away-stats-team-pyds],[away-stats-team-ryds],[away-stats-team-totyds],[away-stats-team-ptavg],[away-stats-team-pen],[away-stats-team-penyds],[away-stats-team-top],[away-abbr],[away-players],[home-to],[home-score-1],[home-score-2],[home-score-3],[home-score-4],[home-score-5],[home-score-T],[home-stats-team-totfd],[home-stats-team-pt],[home-stats-team-ptyds],[home-stats-team-trnovr],[home-stats-team-pyds],[home-stats-team-ryds],[home-stats-team-totyds],[home-stats-team-ptavg],[home-stats-team-pen],[home-stats-team-penyds],[home-stats-team-top]\n From[LandNFL].[game]\n) AS Source ([eid],[home-abbr],[home-players],[away-to],[away-score-1],[away-score-2],[away-score-3],[away-score-4],[away-score-5],[away-score-T],[away-stats-team-totfd],[away-stats-team-pt],[away-stats-team-ptyds],[away-stats-team-trnovr],[away-stats-team-pyds],[away-stats-team-ryds],[away-stats-team-totyds],[away-stats-team-ptavg],[away-stats-team-pen],[away-stats-team-penyds],[away-stats-team-top],[away-abbr],[away-players],[home-to],[home-score-1],[home-score-2],[home-score-3],[home-score-4],[home-score-5],[home-score-T],[home-stats-team-totfd],[home-stats-team-pt],[home-stats-team-ptyds],[home-stats-team-trnovr],[home-stats-team-pyds],[home-stats-team-ryds],[home-stats-team-totyds],[home-stats-team-ptavg],[home-stats-team-pen],[home-stats-team-penyds],[home-stats-team-top])\nON (Target.[eid] = Source.[eid])\nWHEN MATCHED AND (\n\tNULLIF(Source.[home-abbr], Target.[home-abbr]) IS NOT NULL OR NULLIF(Target.[home-abbr], Source.[home-abbr]) IS NOT NULL OR \n\tNULLIF(Source.[home-players], Target.[home-players]) IS NOT NULL OR NULLIF(Target.[home-players], Source.[home-players]) IS NOT NULL OR \n\tNULLIF(Source.[away-to], Target.[away-to]) IS NOT NULL OR NULLIF(Target.[away-to], Source.[away-to]) IS NOT NULL OR \n\tNULLIF(Source.[away-score-1], Target.[away-score-1]) IS NOT NULL OR NULLIF(Target.[away-score-1], Source.[away-score-1]) IS NOT NULL OR \n\tNULLIF(Source.[away-score-2], Target.[away-score-2]) IS NOT NULL OR NULLIF(Target.[away-score-2], Source.[away-score-2]) IS NOT NULL OR \n\tNULLIF(Source.[away-score-3], Target.[away-score-3]) IS NOT NULL OR NULLIF(Target.[away-score-3], Source.[away-score-3]) IS NOT NULL OR \n\tNULLIF(Source.[away-score-4], Target.[away-score-4]) IS NOT NULL OR NULLIF(Target.[away-score-4], Source.[away-score-4]) IS NOT NULL OR \n\tNULLIF(Source.[away-score-5], Target.[away-score-5]) IS NOT NULL OR NULLIF(Target.[away-score-5], Source.[away-score-5]) IS NOT NULL OR \n\tNULLIF(Source.[away-score-T], Target.[away-score-T]) IS NOT NULL OR NULLIF(Target.[away-score-T], Source.[away-score-T]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-totfd], Target.[away-stats-team-totfd]) IS NOT NULL OR NULLIF(Target.[away-stats-team-totfd], Source.[away-stats-team-totfd]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-pt], Target.[away-stats-team-pt]) IS NOT NULL OR NULLIF(Target.[away-stats-team-pt], Source.[away-stats-team-pt]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-ptyds], Target.[away-stats-team-ptyds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-ptyds], Source.[away-stats-team-ptyds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-trnovr], Target.[away-stats-team-trnovr]) IS NOT NULL OR NULLIF(Target.[away-stats-team-trnovr], Source.[away-stats-team-trnovr]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-pyds], Target.[away-stats-team-pyds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-pyds], Source.[away-stats-team-pyds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-ryds], Target.[away-stats-team-ryds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-ryds], Source.[away-stats-team-ryds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-totyds], Target.[away-stats-team-totyds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-totyds], Source.[away-stats-team-totyds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-ptavg], Target.[away-stats-team-ptavg]) IS NOT NULL OR NULLIF(Target.[away-stats-team-ptavg], Source.[away-stats-team-ptavg]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-pen], Target.[away-stats-team-pen]) IS NOT NULL OR NULLIF(Target.[away-stats-team-pen], Source.[away-stats-team-pen]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-penyds], Target.[away-stats-team-penyds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-penyds], Source.[away-stats-team-penyds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-top], Target.[away-stats-team-top]) IS NOT NULL OR NULLIF(Target.[away-stats-team-top], Source.[away-stats-team-top]) IS NOT NULL OR \n\tNULLIF(Source.[away-abbr], Target.[away-abbr]) IS NOT NULL OR NULLIF(Target.[away-abbr], Source.[away-abbr]) IS NOT NULL OR \n\tNULLIF(Source.[away-players], Target.[away-players]) IS NOT NULL OR NULLIF(Target.[away-players], Source.[away-players]) IS NOT NULL OR \n\tNULLIF(Source.[home-to], Target.[home-to]) IS NOT NULL OR NULLIF(Target.[home-to], Source.[home-to]) IS NOT NULL OR \n\tNULLIF(Source.[home-score-1], Target.[home-score-1]) IS NOT NULL OR NULLIF(Target.[home-score-1], Source.[home-score-1]) IS NOT NULL OR \n\tNULLIF(Source.[home-score-2], Target.[home-score-2]) IS NOT NULL OR NULLIF(Target.[home-score-2], Source.[home-score-2]) IS NOT NULL OR \n\tNULLIF(Source.[home-score-3], Target.[home-score-3]) IS NOT NULL OR NULLIF(Target.[home-score-3], Source.[home-score-3]) IS NOT NULL OR \n\tNULLIF(Source.[home-score-4], Target.[home-score-4]) IS NOT NULL OR NULLIF(Target.[home-score-4], Source.[home-score-4]) IS NOT NULL OR \n\tNULLIF(Source.[home-score-5], Target.[home-score-5]) IS NOT NULL OR NULLIF(Target.[home-score-5], Source.[home-score-5]) IS NOT NULL OR \n\tNULLIF(Source.[home-score-T], Target.[home-score-T]) IS NOT NULL OR NULLIF(Target.[home-score-T], Source.[home-score-T]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-totfd], Target.[home-stats-team-totfd]) IS NOT NULL OR NULLIF(Target.[home-stats-team-totfd], Source.[home-stats-team-totfd]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-pt], Target.[home-stats-team-pt]) IS NOT NULL OR NULLIF(Target.[home-stats-team-pt], Source.[home-stats-team-pt]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-ptyds], Target.[home-stats-team-ptyds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-ptyds], Source.[home-stats-team-ptyds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-trnovr], Target.[home-stats-team-trnovr]) IS NOT NULL OR NULLIF(Target.[home-stats-team-trnovr], Source.[home-stats-team-trnovr]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-pyds], Target.[home-stats-team-pyds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-pyds], Source.[home-stats-team-pyds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-ryds], Target.[home-stats-team-ryds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-ryds], Source.[home-stats-team-ryds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-totyds], Target.[home-stats-team-totyds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-totyds], Source.[home-stats-team-totyds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-ptavg], Target.[home-stats-team-ptavg]) IS NOT NULL OR NULLIF(Target.[home-stats-team-ptavg], Source.[home-stats-team-ptavg]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-pen], Target.[home-stats-team-pen]) IS NOT NULL OR NULLIF(Target.[home-stats-team-pen], Source.[home-stats-team-pen]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-penyds], Target.[home-stats-team-penyds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-penyds], Source.[home-stats-team-penyds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-top], Target.[home-stats-team-top]) IS NOT NULL OR NULLIF(Target.[home-stats-team-top], Source.[home-stats-team-top]) IS NOT NULL OR \n  Target.deletets IS NOT NULL) THEN\n UPDATE SET\n  [home-abbr] = Source.[home-abbr], \n  [home-players] = Source.[home-players], \n  [away-to] = Source.[away-to], \n  [away-score-1] = Source.[away-score-1], \n  [away-score-2] = Source.[away-score-2], \n  [away-score-3] = Source.[away-score-3], \n  [away-score-4] = Source.[away-score-4], \n  [away-score-5] = Source.[away-score-5], \n  [away-score-T] = Source.[away-score-T], \n  [away-stats-team-totfd] = Source.[away-stats-team-totfd], \n  [away-stats-team-pt] = Source.[away-stats-team-pt], \n  [away-stats-team-ptyds] = Source.[away-stats-team-ptyds], \n  [away-stats-team-trnovr] = Source.[away-stats-team-trnovr], \n  [away-stats-team-pyds] = Source.[away-stats-team-pyds], \n  [away-stats-team-ryds] = Source.[away-stats-team-ryds], \n  [away-stats-team-totyds] = Source.[away-stats-team-totyds], \n  [away-stats-team-ptavg] = Source.[away-stats-team-ptavg], \n  [away-stats-team-pen] = Source.[away-stats-team-pen], \n  [away-stats-team-penyds] = Source.[away-stats-team-penyds], \n  [away-stats-team-top] = Source.[away-stats-team-top], \n  [away-abbr] = Source.[away-abbr], \n  [away-players] = Source.[away-players], \n  [home-to] = Source.[home-to], \n  [home-score-1] = Source.[home-score-1], \n  [home-score-2] = Source.[home-score-2], \n  [home-score-3] = Source.[home-score-3], \n  [home-score-4] = Source.[home-score-4], \n  [home-score-5] = Source.[home-score-5], \n  [home-score-T] = Source.[home-score-T], \n  [home-stats-team-totfd] = Source.[home-stats-team-totfd], \n  [home-stats-team-pt] = Source.[home-stats-team-pt], \n  [home-stats-team-ptyds] = Source.[home-stats-team-ptyds], \n  [home-stats-team-trnovr] = Source.[home-stats-team-trnovr], \n  [home-stats-team-pyds] = Source.[home-stats-team-pyds], \n  [home-stats-team-ryds] = Source.[home-stats-team-ryds], \n  [home-stats-team-totyds] = Source.[home-stats-team-totyds], \n  [home-stats-team-ptavg] = Source.[home-stats-team-ptavg], \n  [home-stats-team-pen] = Source.[home-stats-team-pen], \n  [home-stats-team-penyds] = Source.[home-stats-team-penyds], \n  [home-stats-team-top] = Source.[home-stats-team-top],\n   [modifyts] = @datetime,\n    deletets = NULL \nWHEN NOT MATCHED BY TARGET THEN\n INSERT([eid],[home-abbr],[home-players],[away-to],[away-score-1],[away-score-2],[away-score-3],[away-score-4],[away-score-5],[away-score-T],[away-stats-team-totfd],[away-stats-team-pt],[away-stats-team-ptyds],[away-stats-team-trnovr],[away-stats-team-pyds],[away-stats-team-ryds],[away-stats-team-totyds],[away-stats-team-ptavg],[away-stats-team-pen],[away-stats-team-penyds],[away-stats-team-top],[away-abbr],[away-players],[home-to],[home-score-1],[home-score-2],[home-score-3],[home-score-4],[home-score-5],[home-score-T],[home-stats-team-totfd],[home-stats-team-pt],[home-stats-team-ptyds],[home-stats-team-trnovr],[home-stats-team-pyds],[home-stats-team-ryds],[home-stats-team-totyds],[home-stats-team-ptavg],[home-stats-team-pen],[home-stats-team-penyds],[home-stats-team-top],[createts],[modifyts],[deletets])\n VALUES(Source.[eid],Source.[home-abbr],Source.[home-players],Source.[away-to],Source.[away-score-1],Source.[away-score-2],Source.[away-score-3],Source.[away-score-4],Source.[away-score-5],Source.[away-score-T],Source.[away-stats-team-totfd],Source.[away-stats-team-pt],Source.[away-stats-team-ptyds],Source.[away-stats-team-trnovr],Source.[away-stats-team-pyds],Source.[away-stats-team-ryds],Source.[away-stats-team-totyds],Source.[away-stats-team-ptavg],Source.[away-stats-team-pen],Source.[away-stats-team-penyds],Source.[away-stats-team-top],Source.[away-abbr],Source.[away-players],Source.[home-to],Source.[home-score-1],Source.[home-score-2],Source.[home-score-3],Source.[home-score-4],Source.[home-score-5],Source.[home-score-T],Source.[home-stats-team-totfd],Source.[home-stats-team-pt],Source.[home-stats-team-ptyds],Source.[home-stats-team-trnovr],Source.[home-stats-team-pyds],Source.[home-stats-team-ryds],Source.[home-stats-team-totyds],Source.[home-stats-team-ptavg],Source.[home-stats-team-pen],Source.[home-stats-team-penyds],Source.[home-stats-team-top],@datetime,@datetime,NULL)\nWHEN NOT MATCHED BY SOURCE AND Target.deletets IS NULL AND Target.eid IN  (SELECT DISTINCT eid FROM [LandNFL].[game])  THEN  \n  UPDATE SET\tdeletets = @datetime\nOUTPUT $action INTO @SummaryOfChanges\n;\nDECLARE @mergeError int\n , @mergeCount int\nSELECT @mergeError = @@ERROR, @mergeCount = @@ROWCOUNT\nIF @mergeError != 0\n BEGIN\n PRINT 'ERROR OCCURRED IN MERGE FOR [MasterNFL].[game]. Rows affected: ' + CAST(@mergeCount AS VARCHAR(100)); -- SQL should always return zero rows affected\n END\nELSE\n BEGIN\n PRINT '[MasterNFL].[game] rows affected by MERGE: ' + CAST(@mergeCount AS VARCHAR(100));\n END\n;\n\n\nDECLARE @rowcount int = @mergeCount, \n\t\t@insert INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'INSERT'), \n\t\t@update INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'update'), \n\t\t@delete INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'DELETE')  \n EXEC dbo.LogProcedure @ProcID = @@PROCID, @RowCount = @rowcount,@insert = @insert,@update = @update, @delete = @delete, @starttime = @datetime, @isStart = false\n;"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_32": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_31": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [MasterNFL].[CDCgame]\nas\n--MERGE generated by 'sp_generate_merge' stored procedure, Version 0.93\n--Originally by Vyas (http://vyaskn.tripod.com): sp_generate_inserts (build 22)\n--Adapted for SQL Server 2008/2012 by Daniel Nolan (http://danere.com)\n\nSET NOCOUNT ON\n\nDECLARE @SummaryOfChanges TABLE(Change VARCHAR(20));\nDECLARE @datetime DATETIMEOFFSET = GETDATE(); \nEXEC dbo.LogProcedure @ProcID =  @@PROCID, @TableName = '[MasterNFL].[game]', @starttime = @datetime, @isStart = true\n;\nMERGE INTO [MasterNFL].[game] AS Target\nUSING  ( \nSelect [eid],[home-abbr],[home-players],[away-to],[away-stats-team-totfd],[away-stats-team-pt],[away-stats-team-ptyds],[away-stats-team-trnovr],[away-stats-team-pyds],[away-stats-team-ryds],[away-stats-team-totyds],[away-stats-team-ptavg],[away-stats-team-pen],[away-stats-team-penyds],[away-stats-team-top],[away-abbr],[away-players],[home-to],[home-stats-team-totfd],[home-stats-team-pt],[home-stats-team-ptyds],[home-stats-team-trnovr],[home-stats-team-pyds],[home-stats-team-ryds],[home-stats-team-totyds],[home-stats-team-ptavg],[home-stats-team-pen],[home-stats-team-penyds],[home-stats-team-top]\n From[LandNFL].[game]\n) AS Source ([eid],[home-abbr],[home-players],[away-to],[away-stats-team-totfd],[away-stats-team-pt],[away-stats-team-ptyds],[away-stats-team-trnovr],[away-stats-team-pyds],[away-stats-team-ryds],[away-stats-team-totyds],[away-stats-team-ptavg],[away-stats-team-pen],[away-stats-team-penyds],[away-stats-team-top],[away-abbr],[away-players],[home-to],[home-stats-team-totfd],[home-stats-team-pt],[home-stats-team-ptyds],[home-stats-team-trnovr],[home-stats-team-pyds],[home-stats-team-ryds],[home-stats-team-totyds],[home-stats-team-ptavg],[home-stats-team-pen],[home-stats-team-penyds],[home-stats-team-top])\nON (Target.[eid] = Source.[eid])\nWHEN MATCHED AND (\n\tNULLIF(Source.[home-abbr], Target.[home-abbr]) IS NOT NULL OR NULLIF(Target.[home-abbr], Source.[home-abbr]) IS NOT NULL OR \n\tNULLIF(Source.[home-players], Target.[home-players]) IS NOT NULL OR NULLIF(Target.[home-players], Source.[home-players]) IS NOT NULL OR \n\tNULLIF(Source.[away-to], Target.[away-to]) IS NOT NULL OR NULLIF(Target.[away-to], Source.[away-to]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-totfd], Target.[away-stats-team-totfd]) IS NOT NULL OR NULLIF(Target.[away-stats-team-totfd], Source.[away-stats-team-totfd]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-pt], Target.[away-stats-team-pt]) IS NOT NULL OR NULLIF(Target.[away-stats-team-pt], Source.[away-stats-team-pt]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-ptyds], Target.[away-stats-team-ptyds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-ptyds], Source.[away-stats-team-ptyds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-trnovr], Target.[away-stats-team-trnovr]) IS NOT NULL OR NULLIF(Target.[away-stats-team-trnovr], Source.[away-stats-team-trnovr]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-pyds], Target.[away-stats-team-pyds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-pyds], Source.[away-stats-team-pyds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-ryds], Target.[away-stats-team-ryds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-ryds], Source.[away-stats-team-ryds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-totyds], Target.[away-stats-team-totyds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-totyds], Source.[away-stats-team-totyds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-ptavg], Target.[away-stats-team-ptavg]) IS NOT NULL OR NULLIF(Target.[away-stats-team-ptavg], Source.[away-stats-team-ptavg]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-pen], Target.[away-stats-team-pen]) IS NOT NULL OR NULLIF(Target.[away-stats-team-pen], Source.[away-stats-team-pen]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-penyds], Target.[away-stats-team-penyds]) IS NOT NULL OR NULLIF(Target.[away-stats-team-penyds], Source.[away-stats-team-penyds]) IS NOT NULL OR \n\tNULLIF(Source.[away-stats-team-top], Target.[away-stats-team-top]) IS NOT NULL OR NULLIF(Target.[away-stats-team-top], Source.[away-stats-team-top]) IS NOT NULL OR \n\tNULLIF(Source.[away-abbr], Target.[away-abbr]) IS NOT NULL OR NULLIF(Target.[away-abbr], Source.[away-abbr]) IS NOT NULL OR \n\tNULLIF(Source.[away-players], Target.[away-players]) IS NOT NULL OR NULLIF(Target.[away-players], Source.[away-players]) IS NOT NULL OR \n\tNULLIF(Source.[home-to], Target.[home-to]) IS NOT NULL OR NULLIF(Target.[home-to], Source.[home-to]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-totfd], Target.[home-stats-team-totfd]) IS NOT NULL OR NULLIF(Target.[home-stats-team-totfd], Source.[home-stats-team-totfd]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-pt], Target.[home-stats-team-pt]) IS NOT NULL OR NULLIF(Target.[home-stats-team-pt], Source.[home-stats-team-pt]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-ptyds], Target.[home-stats-team-ptyds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-ptyds], Source.[home-stats-team-ptyds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-trnovr], Target.[home-stats-team-trnovr]) IS NOT NULL OR NULLIF(Target.[home-stats-team-trnovr], Source.[home-stats-team-trnovr]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-pyds], Target.[home-stats-team-pyds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-pyds], Source.[home-stats-team-pyds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-ryds], Target.[home-stats-team-ryds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-ryds], Source.[home-stats-team-ryds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-totyds], Target.[home-stats-team-totyds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-totyds], Source.[home-stats-team-totyds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-ptavg], Target.[home-stats-team-ptavg]) IS NOT NULL OR NULLIF(Target.[home-stats-team-ptavg], Source.[home-stats-team-ptavg]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-pen], Target.[home-stats-team-pen]) IS NOT NULL OR NULLIF(Target.[home-stats-team-pen], Source.[home-stats-team-pen]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-penyds], Target.[home-stats-team-penyds]) IS NOT NULL OR NULLIF(Target.[home-stats-team-penyds], Source.[home-stats-team-penyds]) IS NOT NULL OR \n\tNULLIF(Source.[home-stats-team-top], Target.[home-stats-team-top]) IS NOT NULL OR NULLIF(Target.[home-stats-team-top], Source.[home-stats-team-top]) IS NOT NULL OR \n  Target.deletets IS NOT NULL) THEN\n UPDATE SET\n  [home-abbr] = Source.[home-abbr], \n  [home-players] = Source.[home-players], \n  [away-to] = Source.[away-to], \n  [away-stats-team-totfd] = Source.[away-stats-team-totfd], \n  [away-stats-team-pt] = Source.[away-stats-team-pt], \n  [away-stats-team-ptyds] = Source.[away-stats-team-ptyds], \n  [away-stats-team-trnovr] = Source.[away-stats-team-trnovr], \n  [away-stats-team-pyds] = Source.[away-stats-team-pyds], \n  [away-stats-team-ryds] = Source.[away-stats-team-ryds], \n  [away-stats-team-totyds] = Source.[away-stats-team-totyds], \n  [away-stats-team-ptavg] = Source.[away-stats-team-ptavg], \n  [away-stats-team-pen] = Source.[away-stats-team-pen], \n  [away-stats-team-penyds] = Source.[away-stats-team-penyds], \n  [away-stats-team-top] = Source.[away-stats-team-top], \n  [away-abbr] = Source.[away-abbr], \n  [away-players] = Source.[away-players], \n  [home-to] = Source.[home-to], \n  [home-stats-team-totfd] = Source.[home-stats-team-totfd], \n  [home-stats-team-pt] = Source.[home-stats-team-pt], \n  [home-stats-team-ptyds] = Source.[home-stats-team-ptyds], \n  [home-stats-team-trnovr] = Source.[home-stats-team-trnovr], \n  [home-stats-team-pyds] = Source.[home-stats-team-pyds], \n  [home-stats-team-ryds] = Source.[home-stats-team-ryds], \n  [home-stats-team-totyds] = Source.[home-stats-team-totyds], \n  [home-stats-team-ptavg] = Source.[home-stats-team-ptavg], \n  [home-stats-team-pen] = Source.[home-stats-team-pen], \n  [home-stats-team-penyds] = Source.[home-stats-team-penyds], \n  [home-stats-team-top] = Source.[home-stats-team-top],\n   [modifyts] = @datetime,\n    deletets = NULL \nWHEN NOT MATCHED BY TARGET THEN\n INSERT([eid],[home-abbr],[home-players],[away-to],[away-stats-team-totfd],[away-stats-team-pt],[away-stats-team-ptyds],[away-stats-team-trnovr],[away-stats-team-pyds],[away-stats-team-ryds],[away-stats-team-totyds],[away-stats-team-ptavg],[away-stats-team-pen],[away-stats-team-penyds],[away-stats-team-top],[away-abbr],[away-players],[home-to],[home-stats-team-totfd],[home-stats-team-pt],[home-stats-team-ptyds],[home-stats-team-trnovr],[home-stats-team-pyds],[home-stats-team-ryds],[home-stats-team-totyds],[home-stats-team-ptavg],[home-stats-team-pen],[home-stats-team-penyds],[home-stats-team-top],[createts],[modifyts],[deletets])\n VALUES(Source.[eid],Source.[home-abbr],Source.[home-players],Source.[away-to],Source.[away-stats-team-totfd],Source.[away-stats-team-pt],Source.[away-stats-team-ptyds],Source.[away-stats-team-trnovr],Source.[away-stats-team-pyds],Source.[away-stats-team-ryds],Source.[away-stats-team-totyds],Source.[away-stats-team-ptavg],Source.[away-stats-team-pen],Source.[away-stats-team-penyds],Source.[away-stats-team-top],Source.[away-abbr],Source.[away-players],Source.[home-to],Source.[home-stats-team-totfd],Source.[home-stats-team-pt],Source.[home-stats-team-ptyds],Source.[home-stats-team-trnovr],Source.[home-stats-team-pyds],Source.[home-stats-team-ryds],Source.[home-stats-team-totyds],Source.[home-stats-team-ptavg],Source.[home-stats-team-pen],Source.[home-stats-team-penyds],Source.[home-stats-team-top],@datetime,@datetime,NULL)\nWHEN NOT MATCHED BY SOURCE AND Target.deletets IS NULL AND Target.eid IN  (SELECT DISTINCT eid FROM [LandNFL].[game])  THEN  \n  UPDATE SET\tdeletets = @datetime\nOUTPUT $action INTO @SummaryOfChanges\n;\nDECLARE @mergeError int\n , @mergeCount int\nSELECT @mergeError = @@ERROR, @mergeCount = @@ROWCOUNT\nIF @mergeError != 0\n BEGIN\n PRINT 'ERROR OCCURRED IN MERGE FOR [MasterNFL].[game]. Rows affected: ' + CAST(@mergeCount AS VARCHAR(100)); -- SQL should always return zero rows affected\n END\nELSE\n BEGIN\n PRINT '[MasterNFL].[game] rows affected by MERGE: ' + CAST(@mergeCount AS VARCHAR(100));\n END\n;\n\n\nDECLARE @rowcount int = @mergeCount, \n\t\t@insert INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'INSERT'), \n\t\t@update INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'update'), \n\t\t@delete INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'DELETE')  \n EXEC dbo.LogProcedure @ProcID = @@PROCID, @RowCount = @rowcount,@insert = @insert,@update = @update, @delete = @delete, @starttime = @datetime, @isStart = false\n;"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_33": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_32": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [MasterNFL].[CDCplay]\nas\n\n--MERGE generated by 'sp_generate_merge' stored procedure, Version 0.93\n--Originally by Vyas (http://vyaskn.tripod.com): sp_generate_inserts (build 22)\n--Adapted for SQL Server 2008/2012 by Daniel Nolan (http://danere.com)\n\nSET NOCOUNT ON\n\nDECLARE @SummaryOfChanges TABLE(Change VARCHAR(20));\nDECLARE @datetime DATETIMEOFFSET = GETDATE(); \nEXEC dbo.LogProcedure @ProcID =  @@PROCID, @TableName = '[MasterNFL].[play]', @starttime = @datetime, @isStart = true\n;\nMERGE INTO [MasterNFL].[play] AS Target\nUSING  ( \nSelect [eid],[drivenumber],[playnumber],[posteam],[desc],[ydstogo],[note],[qtr],[yrdln],[sp],[down],[time],[ydsnet]\n From[LandNFL].[play]\n) AS Source ([eid],[drivenumber],[playnumber],[posteam],[desc],[ydstogo],[note],[qtr],[yrdln],[sp],[down],[time],[ydsnet])\nON (Target.[drivenumber] = Source.[drivenumber] AND Target.[eid] = Source.[eid] AND Target.[playnumber] = Source.[playnumber])\nWHEN MATCHED AND (\n\tNULLIF(Source.[posteam], Target.[posteam]) IS NOT NULL OR NULLIF(Target.[posteam], Source.[posteam]) IS NOT NULL OR \n\tNULLIF(Source.[desc], Target.[desc]) IS NOT NULL OR NULLIF(Target.[desc], Source.[desc]) IS NOT NULL OR \n\tNULLIF(Source.[ydstogo], Target.[ydstogo]) IS NOT NULL OR NULLIF(Target.[ydstogo], Source.[ydstogo]) IS NOT NULL OR \n\tNULLIF(Source.[note], Target.[note]) IS NOT NULL OR NULLIF(Target.[note], Source.[note]) IS NOT NULL OR \n\tNULLIF(Source.[qtr], Target.[qtr]) IS NOT NULL OR NULLIF(Target.[qtr], Source.[qtr]) IS NOT NULL OR \n\tNULLIF(Source.[yrdln], Target.[yrdln]) IS NOT NULL OR NULLIF(Target.[yrdln], Source.[yrdln]) IS NOT NULL OR \n\tNULLIF(Source.[sp], Target.[sp]) IS NOT NULL OR NULLIF(Target.[sp], Source.[sp]) IS NOT NULL OR \n\tNULLIF(Source.[down], Target.[down]) IS NOT NULL OR NULLIF(Target.[down], Source.[down]) IS NOT NULL OR \n\tNULLIF(Source.[time], Target.[time]) IS NOT NULL OR NULLIF(Target.[time], Source.[time]) IS NOT NULL OR \n\tNULLIF(Source.[ydsnet], Target.[ydsnet]) IS NOT NULL OR NULLIF(Target.[ydsnet], Source.[ydsnet]) IS NOT NULL OR \n  Target.deletets IS NOT NULL) THEN\n UPDATE SET\n  [posteam] = Source.[posteam], \n  [desc] = Source.[desc], \n  [ydstogo] = Source.[ydstogo], \n  [note] = Source.[note], \n  [qtr] = Source.[qtr], \n  [yrdln] = Source.[yrdln], \n  [sp] = Source.[sp], \n  [down] = Source.[down], \n  [time] = Source.[time], \n  [ydsnet] = Source.[ydsnet],\n   [modifyts] = @datetime,\n    deletets = NULL \nWHEN NOT MATCHED BY TARGET THEN\n INSERT([eid],[drivenumber],[playnumber],[posteam],[desc],[ydstogo],[note],[qtr],[yrdln],[sp],[down],[time],[ydsnet],[createts],[modifyts],[deletets])\n VALUES(Source.[eid],Source.[drivenumber],Source.[playnumber],Source.[posteam],Source.[desc],Source.[ydstogo],Source.[note],Source.[qtr],Source.[yrdln],Source.[sp],Source.[down],Source.[time],Source.[ydsnet],@datetime,@datetime,NULL)\nWHEN NOT MATCHED BY SOURCE AND Target.deletets IS NULL AND Target.eid IN  (SELECT DISTINCT eid FROM [LandNFL].[play])  THEN  \n  UPDATE SET\tdeletets = @datetime\nOUTPUT $action INTO @SummaryOfChanges\n;\nDECLARE @mergeError int\n , @mergeCount int\nSELECT @mergeError = @@ERROR, @mergeCount = @@ROWCOUNT\nIF @mergeError != 0\n BEGIN\n PRINT 'ERROR OCCURRED IN MERGE FOR [MasterNFL].[play]. Rows affected: ' + CAST(@mergeCount AS VARCHAR(100)); -- SQL should always return zero rows affected\n END\nELSE\n BEGIN\n PRINT '[MasterNFL].[play] rows affected by MERGE: ' + CAST(@mergeCount AS VARCHAR(100));\n END\n;\n\n\nDECLARE @rowcount int = @mergeCount, \n\t\t@insert INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'INSERT'), \n\t\t@update INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'update'), \n\t\t@delete INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'DELETE')  \n EXEC dbo.LogProcedure @ProcID = @@PROCID, @RowCount = @rowcount,@insert = @insert,@update = @update, @delete = @delete, @starttime = @datetime, @isStart = false\n;\n\nSET NOCOUNT OFF\n;"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_34": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_38": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [MasterNFL].[CDCSchedule]\nAS \n\n--MERGE generated by 'sp_generate_merge' stored procedure, Version 0.93\n--Originally by Vyas (http://vyaskn.tripod.com): sp_generate_inserts (build 22)\n--Adapted for SQL Server 2008/2012 by Daniel Nolan (http://danere.com)\n\nSET NOCOUNT ON\n\nDECLARE @SummaryOfChanges TABLE(Change VARCHAR(20));\nDECLARE @datetime DATETIMEOFFSET = GETDATE(); \nEXEC dbo.LogProcedure @ProcID =  @@PROCID, @TableName = '[MasterNFL].[schedule]', @starttime = @datetime, @isStart = true\n;\nMERGE INTO [MasterNFL].[schedule] AS Target\nUSING  ( \nSelect [eid],[gsis],[SeasonYear],[SeasonType],[SeasonTypeDetail],[wkNumber],[DayName],[GameTime],[GameTimeUTC],[Qtr],[HomeTeam],[HomeTeamName],[AwayTeam],[AwayTeamName]\n From[LandNFL].[schedule_vw]\n) AS Source ([eid],[gsis],[SeasonYear],[SeasonType],[SeasonTypeDetail],[wkNumber],[DayName],[GameTime],[GameTimeUTC],[Qtr],[HomeTeam],[HomeTeamName],[AwayTeam],[AwayTeamName])\nON (Target.[eid] = Source.[eid])\nWHEN MATCHED AND (\n\tNULLIF(Source.[gsis], Target.[gsis]) IS NOT NULL OR NULLIF(Target.[gsis], Source.[gsis]) IS NOT NULL OR \n\tNULLIF(Source.[SeasonYear], Target.[SeasonYear]) IS NOT NULL OR NULLIF(Target.[SeasonYear], Source.[SeasonYear]) IS NOT NULL OR \n\tNULLIF(Source.[SeasonType], Target.[SeasonType]) IS NOT NULL OR NULLIF(Target.[SeasonType], Source.[SeasonType]) IS NOT NULL OR \n\tNULLIF(Source.[SeasonTypeDetail], Target.[SeasonTypeDetail]) IS NOT NULL OR NULLIF(Target.[SeasonTypeDetail], Source.[SeasonTypeDetail]) IS NOT NULL OR \n\tNULLIF(Source.[wkNumber], Target.[wkNumber]) IS NOT NULL OR NULLIF(Target.[wkNumber], Source.[wkNumber]) IS NOT NULL OR \n\tNULLIF(Source.[DayName], Target.[DayName]) IS NOT NULL OR NULLIF(Target.[DayName], Source.[DayName]) IS NOT NULL OR \n\tNULLIF(Source.[GameTime], Target.[GameTime]) IS NOT NULL OR NULLIF(Target.[GameTime], Source.[GameTime]) IS NOT NULL OR \n\tNULLIF(Source.[GameTimeUTC], Target.[GameTimeUTC]) IS NOT NULL OR NULLIF(Target.[GameTimeUTC], Source.[GameTimeUTC]) IS NOT NULL OR \n\tNULLIF(Source.[Qtr], Target.[Qtr]) IS NOT NULL OR NULLIF(Target.[Qtr], Source.[Qtr]) IS NOT NULL OR \n\tNULLIF(Source.[HomeTeam], Target.[HomeTeam]) IS NOT NULL OR NULLIF(Target.[HomeTeam], Source.[HomeTeam]) IS NOT NULL OR \n\tNULLIF(Source.[HomeTeamName], Target.[HomeTeamName]) IS NOT NULL OR NULLIF(Target.[HomeTeamName], Source.[HomeTeamName]) IS NOT NULL OR \n\tNULLIF(Source.[AwayTeam], Target.[AwayTeam]) IS NOT NULL OR NULLIF(Target.[AwayTeam], Source.[AwayTeam]) IS NOT NULL OR \n\tNULLIF(Source.[AwayTeamName], Target.[AwayTeamName]) IS NOT NULL OR NULLIF(Target.[AwayTeamName], Source.[AwayTeamName]) IS NOT NULL OR \n  Target.deletets IS NOT NULL) THEN\n UPDATE SET\n  [gsis] = Source.[gsis], \n  [SeasonYear] = Source.[SeasonYear], \n  [SeasonType] = Source.[SeasonType], \n  [SeasonTypeDetail] = Source.[SeasonTypeDetail], \n  [wkNumber] = Source.[wkNumber], \n  [DayName] = Source.[DayName], \n  [GameTime] = Source.[GameTime], \n  [GameTimeUTC] = Source.[GameTimeUTC], \n  [Qtr] = Source.[Qtr], \n  [HomeTeam] = Source.[HomeTeam], \n  [HomeTeamName] = Source.[HomeTeamName], \n  [AwayTeam] = Source.[AwayTeam], \n  [AwayTeamName] = Source.[AwayTeamName],\n   [modifyts] = @datetime,\n    deletets = NULL \nWHEN NOT MATCHED BY TARGET THEN\n INSERT([eid],[gsis],[SeasonYear],[SeasonType],[SeasonTypeDetail],[wkNumber],[DayName],[GameTime],[GameTimeUTC],[Qtr],[HomeTeam],[HomeTeamName],[AwayTeam],[AwayTeamName],[createts],[modifyts],[deletets])\n VALUES(Source.[eid],Source.[gsis],Source.[SeasonYear],Source.[SeasonType],Source.[SeasonTypeDetail],Source.[wkNumber],Source.[DayName],Source.[GameTime],Source.[GameTimeUTC],Source.[Qtr],Source.[HomeTeam],Source.[HomeTeamName],Source.[AwayTeam],Source.[AwayTeamName],@datetime,@datetime,NULL)\nWHEN NOT MATCHED BY SOURCE AND Target.deletets IS NULL AND Target.eid IN  (SELECT DISTINCT eid FROM [LandNFL].[schedule])  THEN  \n  UPDATE SET\tdeletets = @datetime\nOUTPUT $action INTO @SummaryOfChanges\n;\nDECLARE @mergeError int\n , @mergeCount int\nSELECT @mergeError = @@ERROR, @mergeCount = @@ROWCOUNT\nIF @mergeError != 0\n BEGIN\n PRINT 'ERROR OCCURRED IN MERGE FOR [MasterNFL].[schedule]. Rows affected: ' + CAST(@mergeCount AS VARCHAR(100)); -- SQL should always return zero rows affected\n END\nELSE\n BEGIN\n PRINT '[MasterNFL].[schedule] rows affected by MERGE: ' + CAST(@mergeCount AS VARCHAR(100));\n END\n;\n\n\nDECLARE @rowcount int = @mergeCount, \n\t\t@insert INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'INSERT'), \n\t\t@update INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'update'), \n\t\t@delete INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'DELETE')  \n EXEC dbo.LogProcedure @ProcID = @@PROCID, @RowCount = @rowcount,@insert = @insert,@update = @update, @delete = @delete, @starttime = @datetime, @isStart = false\n;"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_35": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_34": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [NFLDB].[BuildSchedule]\nAS\n\n--MERGE generated by 'sp_generate_merge' stored procedure, Version 0.93\n--Originally by Vyas (http://vyaskn.tripod.com): sp_generate_inserts (build 22)\n--Adapted for SQL Server 2008/2012 by Daniel Nolan (http://danere.com)\n\nSET NOCOUNT ON\n\nDECLARE @SummaryOfChanges TABLE(Change VARCHAR(20));\nDECLARE @datetime DATETIMEOFFSET = GETDATE(); \nEXEC dbo.LogProcedure @ProcID =  @@PROCID, @TableName = '[nfldb].[schedule]', @starttime = @datetime, @isStart = true\n;\nMERGE INTO [nfldb].[schedule] AS Target\nUSING  ( \nSelect [GameID],[SeasonYear],[SeasonType],[SeasonTypeDetail],[WkNumber],[DayName],[GameTime],[GameTimeUTC],[Qtr],[HomeTeam],[HomeTeamName],[AwayTeam],[AwayTeamName]\n From[nfldb].[schedule_vw]\n) AS Source ([GameID],[SeasonYear],[SeasonType],[SeasonTypeDetail],[WkNumber],[DayName],[GameTime],[GameTimeUTC],[Qtr],[HomeTeam],[HomeTeamName],[AwayTeam],[AwayTeamName])\nON (Target.[GameID] = Source.[GameID])\nWHEN MATCHED AND (\n\tNULLIF(Source.[GameID], Target.[GameID]) IS NOT NULL OR NULLIF(Target.[GameID], Source.[GameID]) IS NOT NULL OR \n\tNULLIF(Source.[SeasonYear], Target.[SeasonYear]) IS NOT NULL OR NULLIF(Target.[SeasonYear], Source.[SeasonYear]) IS NOT NULL OR \n\tNULLIF(Source.[SeasonType], Target.[SeasonType]) IS NOT NULL OR NULLIF(Target.[SeasonType], Source.[SeasonType]) IS NOT NULL OR \n\tNULLIF(Source.[SeasonTypeDetail], Target.[SeasonTypeDetail]) IS NOT NULL OR NULLIF(Target.[SeasonTypeDetail], Source.[SeasonTypeDetail]) IS NOT NULL OR \n\tNULLIF(Source.[WkNumber], Target.[WkNumber]) IS NOT NULL OR NULLIF(Target.[WkNumber], Source.[WkNumber]) IS NOT NULL OR \n\tNULLIF(Source.[DayName], Target.[DayName]) IS NOT NULL OR NULLIF(Target.[DayName], Source.[DayName]) IS NOT NULL OR \n\tNULLIF(Source.[GameTime], Target.[GameTime]) IS NOT NULL OR NULLIF(Target.[GameTime], Source.[GameTime]) IS NOT NULL OR \n\tNULLIF(Source.[GameTimeUTC], Target.[GameTimeUTC]) IS NOT NULL OR NULLIF(Target.[GameTimeUTC], Source.[GameTimeUTC]) IS NOT NULL OR \n\tNULLIF(Source.[Qtr], Target.[Qtr]) IS NOT NULL OR NULLIF(Target.[Qtr], Source.[Qtr]) IS NOT NULL OR \n\tNULLIF(Source.[HomeTeam], Target.[HomeTeam]) IS NOT NULL OR NULLIF(Target.[HomeTeam], Source.[HomeTeam]) IS NOT NULL OR \n\tNULLIF(Source.[HomeTeamName], Target.[HomeTeamName]) IS NOT NULL OR NULLIF(Target.[HomeTeamName], Source.[HomeTeamName]) IS NOT NULL OR \n\tNULLIF(Source.[AwayTeam], Target.[AwayTeam]) IS NOT NULL OR NULLIF(Target.[AwayTeam], Source.[AwayTeam]) IS NOT NULL OR \n\tNULLIF(Source.[AwayTeamName], Target.[AwayTeamName]) IS NOT NULL OR NULLIF(Target.[AwayTeamName], Source.[AwayTeamName]) IS NOT NULL) THEN \n UPDATE SET\n  [GameID] = Source.[GameID], \n  [SeasonYear] = Source.[SeasonYear], \n  [SeasonType] = Source.[SeasonType], \n  [SeasonTypeDetail] = Source.[SeasonTypeDetail], \n  [WkNumber] = Source.[WkNumber], \n  [DayName] = Source.[DayName], \n  [GameTime] = Source.[GameTime], \n  [GameTimeUTC] = Source.[GameTimeUTC], \n  [Qtr] = Source.[Qtr], \n  [HomeTeam] = Source.[HomeTeam], \n  [HomeTeamName] = Source.[HomeTeamName], \n  [AwayTeam] = Source.[AwayTeam], \n  [AwayTeamName] = Source.[AwayTeamName]\nWHEN NOT MATCHED BY TARGET THEN\n INSERT([GameID],[SeasonYear],[SeasonType],[SeasonTypeDetail],[WkNumber],[DayName],[GameTime],[GameTimeUTC],[Qtr],[HomeTeam],[HomeTeamName],[AwayTeam],[AwayTeamName] )\n VALUES(Source.[GameID],Source.[SeasonYear],Source.[SeasonType],Source.[SeasonTypeDetail],Source.[WkNumber],Source.[DayName],Source.[GameTime],Source.[GameTimeUTC],Source.[Qtr],Source.[HomeTeam],Source.[HomeTeamName],Source.[AwayTeam],Source.[AwayTeamName])\nWHEN NOT MATCHED BY SOURCE THEN \n DELETE\n OUTPUT $action INTO @SummaryOfChanges \n;\nDECLARE @mergeError int\n , @mergeCount int\nSELECT @mergeError = @@ERROR, @mergeCount = @@ROWCOUNT\nIF @mergeError != 0\n BEGIN\n PRINT 'ERROR OCCURRED IN MERGE FOR [nfldb].[schedule]. Rows affected: ' + CAST(@mergeCount AS VARCHAR(100)); -- SQL should always return zero rows affected\n END\nELSE\n BEGIN\n PRINT '[nfldb].[schedule] rows affected by MERGE: ' + CAST(@mergeCount AS VARCHAR(100));\n END\n;\n\n\nDECLARE @rowcount int = @mergeCount, \n\t\t@insert INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'INSERT'), \n\t\t@update INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'update'), \n\t\t@delete INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'DELETE')  \n EXEC dbo.LogProcedure @ProcID = @@PROCID, @RowCount = @rowcount,@insert = @insert,@update = @update, @delete = @delete, @starttime = @datetime, @isStart = false\n;"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_36": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_35": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "INSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (0,'PRE','Preseason')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (1,'PRE','Preseason')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (2,'PRE','Preseason')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (3,'PRE','Preseason')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (4,'PRE','Preseason')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (1,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (2,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (3,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (4,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (5,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (6,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (7,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (8,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (9,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (10,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (11,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (12,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (13,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (14,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (15,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (16,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (17,'REG','Regular')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (18,'POST','Wild Card')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (19,'POST','Divisional')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (20,'POST','Conference ')\nINSERT INTO NFLDB.ScheduleDefinition(week,SeasonType,DESCRIPTION) VALUES (22,'POST','Super Bowl')"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_37": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_36": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE EXTERNAL DATA SOURCE nflgenstorage\nWITH ( TYPE = BLOB_STORAGE, LOCATION = 'https://nflgenstoragers.blob.core.windows.net');"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_38": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_33": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE PROC [MasterNFL].[CDCplayplayer]\nAS\n\nSET NOCOUNT ON\n\nDECLARE @SummaryOfChanges TABLE(Change VARCHAR(20));\nDECLARE @datetime DATETIMEOFFSET = GETDATE(); \nEXEC dbo.LogProcedure @ProcID =  @@PROCID, @TableName = '[MasterNFL].[playplayer]', @starttime = @datetime, @isStart = true\n;\nMERGE INTO [MasterNFL].[playplayer] AS Target\nUSING  ( \nSelect [eid],[drivenumber],[playnumber],[playerid],[statId],[sequence],[playerName],[clubcode],[yards]\n From[LandNFL].[playplayer]\n) AS Source ([eid],[drivenumber],[playnumber],[playerid],[statId],[sequence],[playerName],[clubcode],[yards])\nON (Target.[drivenumber] = Source.[drivenumber] AND Target.[eid] = Source.[eid] AND Target.[playerid] = Source.[playerid] AND Target.[playnumber] = Source.[playnumber])\nWHEN MATCHED AND (\n\tNULLIF(Source.[statId], Target.[statId]) IS NOT NULL OR NULLIF(Target.[statId], Source.[statId]) IS NOT NULL OR \n\tNULLIF(Source.[sequence], Target.[sequence]) IS NOT NULL OR NULLIF(Target.[sequence], Source.[sequence]) IS NOT NULL OR \n\tNULLIF(Source.[playerName], Target.[playerName]) IS NOT NULL OR NULLIF(Target.[playerName], Source.[playerName]) IS NOT NULL OR \n\tNULLIF(Source.[clubcode], Target.[clubcode]) IS NOT NULL OR NULLIF(Target.[clubcode], Source.[clubcode]) IS NOT NULL OR \n\tNULLIF(Source.[yards], Target.[yards]) IS NOT NULL OR NULLIF(Target.[yards], Source.[yards]) IS NOT NULL OR \n  Target.deletets IS NOT NULL) THEN\n UPDATE SET\n  [statId] = Source.[statId], \n  [sequence] = Source.[sequence], \n  [playerName] = Source.[playerName], \n  [clubcode] = Source.[clubcode], \n  [yards] = Source.[yards],\n   [modifyts] = @datetime,\n    deletets = NULL \nWHEN NOT MATCHED BY TARGET THEN\n INSERT([eid],[drivenumber],[playnumber],[playerid],[statId],[sequence],[playerName],[clubcode],[yards],[createts],[modifyts],[deletets])\n VALUES(Source.[eid],Source.[drivenumber],Source.[playnumber],Source.[playerid],Source.[statId],Source.[sequence],Source.[playerName],Source.[clubcode],Source.[yards],@datetime,@datetime,NULL)\nWHEN NOT MATCHED BY SOURCE AND Target.deletets IS NULL AND Target.eid IN  (SELECT DISTINCT eid FROM [LandNFL].[playplayer])  THEN  \n  UPDATE SET\tdeletets = @datetime\nOUTPUT $action INTO @SummaryOfChanges\n;\nDECLARE @mergeError int\n , @mergeCount int\nSELECT @mergeError = @@ERROR, @mergeCount = @@ROWCOUNT\nIF @mergeError != 0\n BEGIN\n PRINT 'ERROR OCCURRED IN MERGE FOR [MasterNFL].[playplayer]. Rows affected: ' + CAST(@mergeCount AS VARCHAR(100)); -- SQL should always return zero rows affected\n END\nELSE\n BEGIN\n PRINT '[MasterNFL].[playplayer] rows affected by MERGE: ' + CAST(@mergeCount AS VARCHAR(100));\n END\n;\n\n\nDECLARE @rowcount int = @mergeCount, \n\t\t@insert INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'INSERT'), \n\t\t@update INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'update'), \n\t\t@delete INT = (SELECT COUNT(1) FROM @SummaryOfChanges WHERE Change = 'DELETE')  \n EXEC dbo.LogProcedure @ProcID = @@PROCID, @RowCount = @rowcount,@insert = @insert,@update = @update, @delete = @delete, @starttime = @datetime, @isStart = false\n;"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_4": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_3": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE SCHEMA [SRCNFL]"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_5": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_6": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [srcRNK].[Schedule](\n\t[ScheduleXML] [xml] NULL\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_6": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_4": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE SCHEMA [srcRNK]"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_7": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_5": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE VIEW [srcRNK].[Schedule_vw] AS \nSELECT \n\t  wy.value('@y', 'smallint') AS seasonyear,\n\t  wy.value('@t', 'varchar(4)') AS seasontype,\n      wy.value('@w', 'smallint') AS wkNumber,\n\t  gd.value('@eid','int') AS eid,\n\t  gd.value('@gsis', 'int') AS gsis,\n\t  gd.value('@d', 'varchar(3)') AS [dayName],\n\t  gd.value('@t', 'time') AS Gametime,\t  \n      CONVERT(DATETIME, gd.value('@t', 'time')) AT TIME ZONE 'Eastern Standard Time' AT TIME ZONE 'UTC' AS GameTimeUTC,\n\t  gd.value('@q', 'varchar(1)') AS q,\n\t  gd.value('@k', 'varchar(1)') AS k,\n\t  gd.value('@h', 'varchar(8)') AS hometeam,\n\t  gd.value('@hnn', 'varchar(32)') AS hometeamname,\n\t  gd.value('@v', 'varchar(8)') AS vrteam,\n\t  gd.value('@vnn', 'varchar(32)') AS vrteamname\nFROM \n      srcRNK.Schedule\n\t  CROSS APPLY schedulexml.nodes('/ss/gms') AS WeekYr(wy)\n\t  CROSS APPLY schedulexml.nodes('/ss/gms/g') AS game(gd)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_8": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_7": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE TABLE [LandNFL].[Schedule](\n\t[ScheduleXML] [xml] NULL\n)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Execute_a_SQL_query_9": {
+                            "runAfter": {
+                                "Execute_a_SQL_query_8": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "CREATE VIEW\t[LandNFL].[Schedule_vw] AS \n\nSELECT \n\t  gd.value('@eid','int') AS eid,\n\t  gd.value('@gsis', 'int') AS gsis,\n\t  wy.value('@y', 'smallint') AS SeasonYear,\n\t  wy.value('@t', 'varchar(4)') AS SeasonType,\n\t  gd.value('@gt', 'varchar(4)') AS SeasonTypeDetail,\n      wy.value('@w', 'smallint') AS wkNumber,\n\t  gd.value('@d', 'varchar(3)') AS [dayName],\n\t  gd.value('@t', 'time') AS GameTime,\t  \n     CONVERT(TIME, CONVERT(DATETIME, gd.value('@t', 'time')) AT TIME ZONE 'Eastern Standard Time' AT TIME ZONE 'UTC') AS GameTimeUTC,\n\t  gd.value('@q', 'varchar(1)') AS Qtr,\n\t  gd.value('@h', 'varchar(8)') AS HomeTeam,\n\t  gd.value('@hnn', 'varchar(32)') AS HomeTeamName,\n\t  gd.value('@v', 'varchar(8)') AS AwayTeam,\n\t  gd.value('@vnn', 'varchar(32)') AS AwayTeamName\n\nFROM \n      LandNFL.Schedule\n\t  CROSS APPLY schedulexml.nodes('/ss/gms') AS WeekYr(wy)\n\t  CROSS APPLY schedulexml.nodes('/ss/gms/g') AS game(gd)"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "sql": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', 'sql-1')]",
+                                "connectionName": "sql-1",
+                                "id":"[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/sql')]"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+		{
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "GameDayData_PFunction_Schedule2",
+            "location": "[resourceGroup().location]",
+            "tags": {
+            },
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Week",
+                                "interval": 1,
+                                "schedule": {
+                                    "hours": [
+                                        12,
+                                        13,
+                                        14,
+                                        15,
+                                        16,
+                                        17,
+                                        18,
+                                        19,
+                                        20,
+                                        21,
+                                        22,
+                                        23
+                                    ],
+                                    "minutes": [
+                                        0,
+                                        30
+                                    ],
+                                    "weekDays": [
+                                        "Monday",
+                                        "Thursday",
+                                        "Sunday"
+                                    ]
+                                },
+                                "timeZone": "Central Standard Time"
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "Build_Drive": {
+                            "runAfter": {
+                                "Truncated_Landing_tables": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[NFLDB].[BuildDrive]'))}"
+                            }
+                        },
+                        "Build_Game": {
+                            "runAfter": {
+                                "Truncated_Landing_tables": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[NFLDB].[BuildGame]'))}"
+                            }
+                        },
+                        "Build_Play": {
+                            "runAfter": {
+                                "Truncated_Landing_tables": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[NFLDB].[BuildPlay]'))}"
+                            }
+                        },
+                        "CDCGame": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded",
+                                    "Failed"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCgame]'))}"
+                            }
+                        },
+                        "CDC_Drive": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded",
+                                    "Failed"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCDrive]'))}"
+                            }
+                        },
+                        "CDC_Play": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded",
+                                    "Failed"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCplay]'))}"
+                            }
+                        },
+                        "CDC_Play_Player": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded",
+                                    "Failed"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[MasterNFL].[CDCplayplayer]'))}"
+                            }
+                        },
+                        "Check_For_Updates_needed": {
+                            "runAfter": {
+                                "Set_Season_Year": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "Season": "@variables('SeasonYear')"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[CheckForIncompleteGames]'))}"
+                            }
+                        },
+                        "Check_For_Work": {
+                            "actions": {
+                                "Check_Tier_Level_": {
+                                    "runAfter": {},
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "query": "SELECT  d.name,   \n     slo.database_id, slo.edition, slo.service_objective, slo.elastic_pool_name    \nFROM sys.databases d   \nJOIN sys.database_service_objectives slo    \nON d.database_id = slo.database_id; "
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/query/sql"
+                                    }
+                                },
+                                "For_each_2": {
+                                    "foreach": "@body('Check_Tier_Level_')?['resultsets']?['Table1']",
+                                    "actions": {
+                                        "If_not_equal_to_s3_then_update": {
+                                            "actions": {},
+                                            "runAfter": {},
+                                            "expression": {
+                                                "or": [
+                                                    {
+                                                        "equals": [
+                                                            "@items('For_each_2')?['service_objective']",
+                                                            "S3"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "equals": [
+                                                            1,
+                                                            1
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "type": "If",
+                                            "description": "For now i added 1=1 to not scale up and to test serverless performance/cost "
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Check_Tier_Level_": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Foreach"
+                                }
+                            },
+                            "runAfter": {
+                                "Check_For_Updates_needed": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "else": {
+                                "actions": {
+                                    "Terminate_with_no_error_if_no_work_": {
+                                        "runAfter": {},
+                                        "type": "Terminate",
+                                        "inputs": {
+                                            "runStatus": "Succeeded"
+                                        }
+                                    }
+                                }
+                            },
+                            "expression": {
+                                "and": [
+                                    {
+                                        "equals": [
+                                            "@body('Check_For_Updates_needed')?['returncode']",
+                                            1
+                                        ]
+                                    }
+                                ]
+                            },
+                            "type": "If"
+                        },
+                        "For_each": {
+                            "foreach": "@body('List_Of_Missing_Games')?['resultsets']?['Table1']",
+                            "actions": {
+                                "Bulk_Load_Drive_to_SQL": {
+                                    "runAfter": {
+                                        "Load_Drive_to_Storage": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "eid": "@{items('For_each')?['GameID']}",
+                                            "fileName": "@body('Load_Drive_to_Storage')?['Name']",
+                                            "filePath": "gamedayshred/@{items('For_each')?['SeasonYear']}/"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[bulkloaddrive]'))}"
+                                    }
+                                },
+                                "Bulk_Load_Game_to_SQL": {
+                                    "runAfter": {
+                                        "Load_Game_to_Storage": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "eid": "@{items('For_each')?['GameID']}",
+                                            "fileName": "@body('Load_Game_to_Storage')?['Name']",
+                                            "filePath": "gamedayshred/@{items('For_each')?['SeasonYear']}/"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[bulkloadgame]'))}"
+                                    }
+                                },
+                                "Create_blob": {
+                                    "runAfter": {
+                                        "PShred_PlayerPlay": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_PlayerPlay')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')?['SeasonYear']}",
+                                            "name": "@{items('For_each')?['GameID']}_playerplay.csv"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Execute_stored_procedure_2": {
+                                    "runAfter": {
+                                        "Load_PPlay_to_Storage": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "eid": "@{items('For_each')?['GameID']}",
+                                            "fileName": "@body('Load_PPlay_to_Storage')?['Name']",
+                                            "filePath": "gamedayshred/@{items('For_each')?['SeasonYear']}/"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[bulkloadplay]'))}"
+                                    }
+                                },
+                                "Execute_stored_procedure_3": {
+                                    "runAfter": {
+                                        "Create_blob": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "eid": "@{items('For_each')?['GameID']}",
+                                            "fileName": "@body('Create_blob')?['Name']",
+                                            "filePath": "gamedayshred/@{items('For_each')?['SeasonYear']}/"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[dbo].[bulkloadplayplayer]'))}"
+                                    }
+                                },
+                                "HTTP": {
+                                    "runAfter": {},
+                                    "type": "Http",
+                                    "inputs": {
+                                        "method": "GET",
+                                        "uri": "http://www.nfl.com/liveupdate/game-center/@{items('For_each')?['GameID']}/@{items('For_each')?['GameID']}_gtd.json"
+                                    }
+                                },
+                                "Load_Drive_to_Storage": {
+                                    "runAfter": {
+                                        "PShred_Drive": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_Drive')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')?['SeasonYear']}",
+                                            "name": "@{items('For_each')?['GameID']}_drive.csv"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Load_Game_to_Storage": {
+                                    "runAfter": {
+                                        "PShred_Game": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_Game')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')?['SeasonYear']}",
+                                            "name": "@{items('For_each')?['GameID']}_game.csv"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Load_PPlay_to_Storage": {
+                                    "runAfter": {
+                                        "PShred_Play": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_Play')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')?['SeasonYear']}",
+                                            "name": "@{items('For_each')?['GameID']}_play.csv"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Load_Status_to_Storage": {
+                                    "runAfter": {
+                                        "PShred_Status": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('PShred_Status')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedayshred/@{items('For_each')['SeasonYear']}",
+                                            "name": "@{items('For_each')['GameID']}_status.csv",
+                                            "queryParametersSingleEncoded": true
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "PShred_Drive": {
+                                    "runAfter": {
+                                        "Update_Raw_Json_Blob": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1,\"crntdrv\": 3, \"plays\": 4 }",
+                                            "incl": "{\"drives\":2}",
+                                            "melded": "{\"end\": 4, \"start\": 4 }",
+                                            "pivotix": "[[4]"
+                                        }
+                                    }
+                                },
+                                "PShred_Game": {
+                                    "runAfter": {
+                                        "Update_Raw_Json_Blob": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1}",
+                                            "incl": "{\"qtr\":2,\"away\":2,\"home\":2,\"team\":4,\"1\":4,\"2\":4,\"3\":4,\"4\":4,\"5\":4,\"T\":4}",
+                                            "melded": "{\"away\":2,\"home\":2,\"stats\":3,\"score\":3,\"team\":4}",
+                                            "pivotix": "[[2]"
+                                        }
+                                    }
+                                },
+                                "PShred_Play": {
+                                    "runAfter": {
+                                        "Update_Raw_Json_Blob": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1,\"crntdrv\": 3, \"players\": 6 }",
+                                            "incl": "{\"drives\":2,\"plays\": 4}",
+                                            "melded": "{}",
+                                            "pivotix": "[[6]"
+                                        }
+                                    }
+                                },
+                                "PShred_PlayerPlay": {
+                                    "runAfter": {
+                                        "Update_Raw_Json_Blob": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1,\"crntdrv\": 3}",
+                                            "incl": "{\"drives\":2,\"plays\": 4,\"players\":6}",
+                                            "melded": "{}",
+                                            "pivotix": "[[8]"
+                                        }
+                                    }
+                                },
+                                "PShred_Status": {
+                                    "runAfter": {
+                                        "Skip_for_now": [
+                                            "Failed"
+                                        ]
+                                    },
+                                    "type": "Function",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "function": {
+                                            "id": "[concat(resourceId('Microsoft.Web/sites', parameters('FunctionApp_name')), '/functions/PShredder')]"
+                                        },
+                                        "queries": {
+                                            "excl": "{\"nextupdate\":1}",
+                                            "incl": "{\"weather\":2,\"media\":2,\"yl\":2,\"qtr\":2,\"note\":2,\"down\":2,\"togo\":2,\"redzone\":2,\"clock\":2,\"posteam\":2,\"stadium\":2}",
+                                            "melded": "{}",
+                                            "pivotix": "{}"
+                                        }
+                                    }
+                                },
+                                "Skip_for_now": {
+                                    "actions": {},
+                                    "runAfter": {
+                                        "Update_Raw_Json_Blob": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "equals": [
+                                                    1,
+                                                    0
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "type": "If"
+                                },
+                                "Update_Raw_Json_Blob": {
+                                    "runAfter": {
+                                        "HTTP": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "@body('HTTP')",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azureblob_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/datasets/default/files",
+                                        "queries": {
+                                            "folderPath": "/gamedaydatajson",
+                                            "name": "@{items('For_each')?['GameID']}.json"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "List_Of_Missing_Games": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach",
+                            "runtimeConfiguration": {
+                                "concurrency": {
+                                    "repetitions": 1
+                                }
+                            }
+                        },
+                        "List_Of_Missing_Games": {
+                            "runAfter": {
+                                "Check_For_Work": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "query": "SELECT s.*, g.[current-quarter]\nFROM NFLDB.Schedule AS s\n\t left JOIN MasterNFL.game AS g ON g.eid=s.GameID\nWHERE s.SeasonYear=@{variables('SeasonYear')}\n\tAND ISNULL(g.[current-quarter], '1') not like '%Final%' \n\tAND s.GameDay<=GETDATE()\nORDER BY s.GameID"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/query/sql"
+                            }
+                        },
+                        "Set_Season_Year": {
+                            "runAfter": {},
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "SeasonYear",
+                                        "type": "Integer",
+                                        "value": 2019
+                                    }
+                                ]
+                            }
+                        },
+                        "Truncated_Landing_tables": {
+                            "runAfter": {
+                                "CDCGame": [
+                                    "Succeeded"
+                                ],
+                                "CDC_Drive": [
+                                    "Succeeded"
+                                ],
+                                "CDC_Play": [
+                                    "Succeeded"
+                                ],
+                                "CDC_Play_Player": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['sql_1']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/datasets/default/procedures/@{encodeURIComponent(encodeURIComponent('[LandNFL].[TruncateTables]'))}"
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azureblob_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', 'azureblob-1')]",
+                                "connectionName": "azureblob-1",
+                                "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azureblob')]"
+                            },
+                            "sql_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', 'sql-1')]",
+                                "connectionName": "sql-1",
+                                "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/sql')]"
+                            }
+                        }
+                    }
+                }
+            },
+			"dependsOn": [
+                "[resourceId('Microsoft.Web/connections', 'azureblob-1')]",
+                "[resourceId('Microsoft.Web/connections', 'sql-1')]",
+				"[resourceId('Microsoft.Logic/workflows', 'SetupSQLDB')]"
             ]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Logic/workflows/LoadNFLSchedule'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Logic/workflows/LoadNFLSchedule'.",
             "type": "Microsoft.Logic/workflows",
             "name": "LoadNFLSchedule",
             "apiVersion": "2016-06-01",
@@ -574,12 +2206,33 @@
                         }
                     },
                     "triggers": {
-                        "Recurrence": {
-                            "recurrence": {
-                                "frequency": "Week",
-                                "interval": 1
-                            },
-                            "type": "Recurrence"
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {
+                                    "$id": "http://example.com/root.json",
+                                    "$schema": "http://json-schema.org/draft-07/schema#",
+                                    "definitions": {},
+                                    "properties": {
+                                        "hi": {
+                                            "$id": "#/properties/hi",
+                                            "default": "",
+                                            "examples": [
+                                                ""
+                                            ],
+                                            "pattern": "^(.*)$",
+                                            "title": "The Hi Schema",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "hi"
+                                    ],
+                                    "title": "The Root Schema",
+                                    "type": "object"
+                                }
+                            }
                         }
                     },
                     "actions": {
@@ -755,11 +2408,12 @@
             },
             "dependsOn": [
                 "[resourceId('Microsoft.Web/connections', 'azureblob-1')]",
-                "[resourceId('Microsoft.Web/connections', 'sql-1')]"
+                "[resourceId('Microsoft.Web/connections', 'sql-1')]",
+				"[resourceId('Microsoft.Logic/workflows', 'SetupSQLDB')]"
             ]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Sql/servers/nfldbrs'.",
             "type": "Microsoft.Sql/servers",
             "kind": "v12.0",
             "name": "[parameters('dbserver_name')]",
@@ -774,7 +2428,7 @@
             "dependsOn": []
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Storage/storageAccounts/aiea47qbhs3woazfunctions'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Storage/storageAccounts/aiea47qbhs3woazfunctions'.",
             "type": "Microsoft.Storage/storageAccounts",
             "sku": {
                 "name": "Standard_LRS",
@@ -802,7 +2456,7 @@
             "dependsOn": []
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Storage/storageAccounts/nflgenstoragers'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Storage/storageAccounts/nflgenstoragers'.",
             "type": "Microsoft.Storage/storageAccounts",
             "sku": {
                 "name": "Standard_RAGRS",
@@ -828,10 +2482,45 @@
                     "keySource": "Microsoft.Storage"
                 }
             },
+			"resources": [
+				{
+				  "type": "blobServices/containers",
+				  "apiVersion": "2018-03-01-preview",
+				  "name": "['default/gamedaydatajson']",
+				  "dependsOn": [
+					"[parameters('storageAccount_name')]"
+				  ],
+				  "properties": {
+					"publicAccess": "None"
+				  }
+				},
+				{
+				  "type": "blobServices/containers",
+				  "apiVersion": "2018-03-01-preview",
+				  "name": "['default/gamedayshred']",
+				  "dependsOn": [
+					"[parameters('storageAccount_name')]"
+				  ],
+				  "properties": {
+					"publicAccess": "Blob"
+				  }
+				},
+				{
+				  "type": "blobServices/containers",
+				  "apiVersion": "2018-03-01-preview",
+				  "name": "['default/nflschedule']",
+				  "dependsOn": [
+					"[parameters('storageAccount_name')]"
+				  ],
+				  "properties": {
+					"publicAccess": "None"
+				  }
+				}
+			],
             "dependsOn": []
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/connections/azureblob-1'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Web/connections/azureblob-1'.",
             "type": "Microsoft.Web/connections",
             "name": "azureblob-1",
             "apiVersion": "2016-06-01",
@@ -842,12 +2531,18 @@
                 "customParameterValues": {},
                 "api": {
                     "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/azureblob')]"
-                }
+                },
+				"parameterValues": {
+				"accessKey": "[listKeys(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name')), providers('Microsoft.Storage', 'storageAccounts').apiVersions[0]).keys[0].value]",
+				"accountName": "[parameters('storageAccount_name')]"
+				}
             },
-            "dependsOn": []
+            "dependsOn": [
+			"[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccount_name'))]"
+			]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/connections/sql-1'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Web/connections/sql-1'.",
             "type": "Microsoft.Web/connections",
             "name": "sql-1",
             "apiVersion": "2016-06-01",
@@ -858,12 +2553,18 @@
                 "customParameterValues": {},
                 "api": {
                     "id": "[concat('subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/sql')]"
-                }
+                },
+			"parameterValues": {
+				"server": "[concat(parameters('dbserver_name'),'.database.windows.net')]",
+				"database": "['nfldb']",
+				"username": "['dbadmin']",
+				"password": "[parameters('dbpassword')]"
+				}
             },
             "dependsOn": []
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/serverfarms/NFLGameRS1'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Web/serverfarms/NFLGamers'.",
             "type": "Microsoft.Web/serverfarms",
             "sku": {
                 "name": "Y1",
@@ -890,7 +2591,7 @@
             "dependsOn": []
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/sites/NFLGameRS1'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Web/sites/NFLGamers'.",
             "type": "Microsoft.Web/sites",
             "kind": "functionapp",
             "name": "[parameters('FunctionApp_name')]",
@@ -934,7 +2635,7 @@
             ]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1/databases/nfldbrs1'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Sql/servers/nfldbrs/databases/nfldbrs'.",
             "type": "Microsoft.Sql/servers/databases",
             "kind": "v12.0,user",
             "name": "[concat(parameters('dbserver_name'), '/nfldb')]",
@@ -961,7 +2662,7 @@
             ]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1/firewallRules/AllowAllWindowsAzureIps'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Sql/servers/nfldbrs/firewallRules/AllowAllWindowsAzureIps'.",
             "type": "Microsoft.Sql/servers/firewallRules",
             "kind": "v12.0",
             "name": "[concat(parameters('dbserver_name'), '/AllowAllWindowsAzureIps')]",
@@ -977,7 +2678,7 @@
             ]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1/encryptionProtector/current'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Sql/servers/nfldbrs/encryptionProtector/current'.",
             "type": "Microsoft.Sql/servers/encryptionProtector",
             "kind": "servicemanaged",
             "name": "[concat(parameters('dbserver_name'), '/current')]",
@@ -992,7 +2693,7 @@
             ]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Sql/servers/nfldbrs1/databases/nfldbrs1/transparentDataEncryption/current'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Sql/servers/nfldbrs/databases/nfldbrs/transparentDataEncryption/current'.",
             "type": "Microsoft.Sql/servers/databases/transparentDataEncryption",
             "name": "[concat(parameters('dbserver_name'), '/nfldb/current')]",
             "apiVersion": "2014-04-01",
@@ -1007,7 +2708,7 @@
             ]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/sites/NFLGameRS1/config/web'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Web/sites/NFLGamers/config/web'.",
             "type": "Microsoft.Web/sites/config",
             "name": "[concat(parameters('FunctionApp_name'), '/web')]",
             "apiVersion": "2016-08-01",
@@ -1121,7 +2822,7 @@
             ]
         },
         {
-            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs1/providers/Microsoft.Web/sites/NFLGameRS1/hostNameBindings/nflgamers1.azurewebsites.net'.",
+            "comments": "Generalized from resource: '/subscriptions/b09f6f9b-27bb-4c20-b800-9f0e1e9df5b0/resourceGroups/rs/providers/Microsoft.Web/sites/NFLGamers/hostNameBindings/nflgamers.azurewebsites.net'.",
             "type": "Microsoft.Web/sites/hostNameBindings",
             "name": "[concat(parameters('FunctionApp_name'),'/',parameters('FunctionApp_name'),'.azurewebsites.net')]",
             "apiVersion": "2016-08-01",
