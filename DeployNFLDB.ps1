@@ -8,7 +8,7 @@ $FunctionAppName=   $args[5]
 
 #TODO Add deployment JSON code here
 az group create --name $ResourceGroupName --location $Location
-az group deployment create --name NFLDBDeployment --resource-group $ResourceGroupName  --template-uri "https://raw.githubusercontent.com/ml-systems/nfldb/master/mlsystemsnfldbtemplate.json"  --parameters Dbserver_name=$SQLServername "Function App_name"=$FunctionAppName "Storage_Account_Name"=$StorageAcctName Dbpassword=$SQLPassword
+az group deployment create --name NFLDBDeployment --resource-group $ResourceGroupName  --template-uri "https://raw.githubusercontent.com/ml-systems/nfldb/master/mlsystemsnfldbtemplate.json"  --parameters dbserver_name=$SQLServername "FunctionApp_name"=$FunctionAppName "storageAccount_name"=$StorageAcctName dbpassword=$SQLPassword
 
 #Download Powershell Script file and execute (this can be changed to github)
 Invoke-WebRequest -Uri "https://nflgenstorage.blob.core.windows.net/public/script.sql" -OutFile "script.sql"
