@@ -1,5 +1,5 @@
-$ResourceGroupName $args[0]
-$Location $args[1]
+$ResourceGroupName= $args[0]
+$Location= $args[1]
 $SQLServername=     $args[2]
 $SQLPassword=   $args[3]
 $StorageAcctName=   $args[4]
