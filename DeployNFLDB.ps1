@@ -24,7 +24,7 @@ Invoke-Sqlcmd -ServerInstance "$SQLServername.database.windows.net" -Username db
 
 Write-Output "$SQLDBName Initiated"
 
-Invoke-Sqlcmd -ServerInstance "$SQLServername.database.windows.net" -Username dbadmin -Password $SQLPassword -Database nfldb -Query "CREATE EXTERNAL DATA SOURCE nflgenstorage WITH ( TYPE = BLOB_STORAGE,LOCATION = '$StorageAcctName.blob.core.windows.net')"  -QueryTimeout 65535 -ConnectionTimeout 60 -Verbose
+Invoke-Sqlcmd -ServerInstance "$SQLServername.database.windows.net" -Username dbadmin -Password $SQLPassword -Database nfldb -Query "CREATE EXTERNAL DATA SOURCE nflgenstorage WITH ( TYPE = BLOB_STORAGE,LOCATION = '$($StorageAcctName).blob.core.windows.net')"  -QueryTimeout 65535 -ConnectionTimeout 60 -Verbose
 
 Write-Output "Blob Storage Path Added to nfldb"
 
