@@ -554,7 +554,7 @@
                                     {
                                         "name": "SeasonYear",
                                         "type": "Integer",
-                                        "value": 2017
+                                        "value": 2019
                                     }
                                 ]
                             }
@@ -2381,7 +2381,7 @@
                                     {
                                         "name": "Year",
                                         "type": "Integer",
-                                        "value": 2017
+                                        "value": 2019
                                     }
                                 ]
                             }
