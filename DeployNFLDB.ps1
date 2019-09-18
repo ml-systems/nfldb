@@ -31,4 +31,4 @@ Write-Output "Blob Storage Path Added to nfldb"
 
 #Load 2019 Schedule ? 
 
-#Start-AzureRmLogicApp -ResourceGroupName "NFL" -Name "LoadNFLSchedule2" -TriggerName "Recurrence"
+Start-AzureRmLogicApp -ResourceGroupName "$ResourceGroupName" -Name "LoadNFLSchedule" -TriggerName "Recurrence"
