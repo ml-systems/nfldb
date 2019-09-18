@@ -1,11 +1,11 @@
 # nfldb
 
 <b>Azure auto-deploying, auto-updating NFL database. Get it up and running with 3 lines of code!</b>
-
-
-
+  
+  
+  
 <b>Instructions:</b>
-
+  
 -read the notes  
 -get an Azure account  
 -log in  
