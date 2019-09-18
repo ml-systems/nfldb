@@ -7,7 +7,7 @@
 ## Instructions:
   
 - read the notes  
-- get an Azure account  
+- get an Azure account  [Get a Free Azure Account](https://azure.microsoft.com/en-us/free/)
 - log in  
 - from the web portal, open a cloud shell window  
 - choose powershell as the language in your cloud shell (not bash)  
