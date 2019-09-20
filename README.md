@@ -62,3 +62,12 @@ run it
 
 ## Cost:  
 the DB costs ~ $15/mo.. the storage is a few dollars/mo, maybe. It's pay as you go, and you can delete and reload as you want so.. try it, it'll cost a couple dollars.. and delete the resource group when you're done. It'll stop charging you..
+
+## Troubleshooting:
+The biggest issue we've run into is that names have to be unique across Azure, and we haven't developed a great way to catch non-unique names yet, so you'll only find out in the deployment.
+  
+If your deployment has an issue, the best approach is to delete the resource group (by going into the portal, clicking on resource groups, and clicking the three dots to the right of your resource group you want to delete) and start over.
+
+you can look at a log of your deployment operations to see errors, for more info. issue this command, replacing the "yourresourcegroupname" with your resource group name:
+
+az group deployment operation list --name=NFLDBDeployment --resource-group=yourresouregroupname
