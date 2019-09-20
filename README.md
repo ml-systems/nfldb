@@ -1,6 +1,6 @@
 # nfldb
 
-<b>Azure auto-deploying, auto-updating NFL database. Get it up and running with 3 lines of code!</b>
+<b>Azure auto-deploying, auto-updating NFL database. Get it up and running with 3 lines of code</b>
   
   
   
