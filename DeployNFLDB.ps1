@@ -29,7 +29,3 @@ Invoke-Sqlcmd -ServerInstance "$SQLServername.database.windows.net" -Username db
 
   Write-Output "Blob Storage Path Added to nfldb"
 
-
-#Load 2019 Schedule
-Start-AzureRmLogicApp -ResourceGroupName $ResourceGroupName -Name "LoadNFLSchedule" -TriggerName "Manual"
-  Write-Output "Schedule Load Started"
