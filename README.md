@@ -12,9 +12,10 @@
 - from the web portal, open a cloud shell window  
 - choose powershell as the language in your cloud shell (not bash)  
 - enter the three lines of code below, replacing your own unique arguments in the last command.  
-   - this will build all the resources  
-- go into the GameDayData_PFunction_Schedule2 logic app in your Azure portal and run it  
-   -this will load 2019's data.. will take about 20 min (on the lowest DB tier that it's defaulted to)  
+   - this will build all the resources
+- go into the LoadNFLSchedule logic app, enable it, and run the trigger. This will populate the 2019 schedule. Wait until it has completed
+- go into the GameDayData_PFunction_Schedule2 logic app in your Azure portal and enable it
+   -this will load 2019's data.. will take about 15-20 min (on the lowest DB tier that it's defaulted to)  
 - download SSMS  
 - connect to your database server at the location mydbserver.database.windows.net  (replace mydbserver with your unique name)  
 - it will prompt you to login, to allow your ip address through the database server firewall  
