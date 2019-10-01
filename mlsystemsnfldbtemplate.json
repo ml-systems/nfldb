@@ -580,6 +580,7 @@
                                             "excl": "{\"nextupdate\":1,\"crntdrv\": 3, \"plays\": 4 }",
                                             "incl": "{\"drives\":2}",
                                             "melded": "{\"end\": 4, \"start\": 4 }",
+					    "keyify":"{}",
                                             "pivotix": "[[4]"
                                         }
                                     }
@@ -600,6 +601,7 @@
                                             "excl": "{\"nextupdate\":1}",
                                             "incl": "{\"qtr\":2,\"away\":2,\"home\":2,\"team\":4,\"1\":4,\"2\":4,\"3\":4,\"4\":4,\"5\":4,\"T\":4}",
                                             "melded": "{\"away\":2,\"home\":2,\"stats\":3,\"score\":3,\"team\":4}",
+					    "keyify":"{\"sequence\": 8}",
                                             "pivotix": "[[2]"
                                         }
                                     }
@@ -620,7 +622,8 @@
                                             "excl": "{\"nextupdate\":1,\"crntdrv\": 3, \"players\": 6 }",
                                             "incl": "{\"drives\":2,\"plays\": 4}",
                                             "melded": "{}",
-                                            "pivotix": "[[6]"
+					    "keyify":"{\"sequence\": 8}",
+                                            "pivotix": "[[8]"
                                         }
                                     }
                                 },
@@ -640,6 +643,7 @@
                                             "excl": "{\"nextupdate\":1,\"crntdrv\": 3}",
                                             "incl": "{\"drives\":2,\"plays\": 4,\"players\":6}",
                                             "melded": "{}",
+					    "keyify":"{}",
                                             "pivotix": "[[8]"
                                         }
                                     }
@@ -660,6 +664,7 @@
                                             "excl": "{\"nextupdate\":1}",
                                             "incl": "{\"weather\":2,\"media\":2,\"yl\":2,\"qtr\":2,\"note\":2,\"down\":2,\"togo\":2,\"redzone\":2,\"clock\":2,\"posteam\":2,\"stadium\":2}",
                                             "melded": "{}",
+					    "keyify":"{}",
                                             "pivotix": "{}"
                                         }
                                     }
