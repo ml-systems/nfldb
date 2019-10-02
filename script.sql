@@ -957,8 +957,7 @@ CREATE TABLE [LandNFL].[playplayer](
 	[statId] [varchar](50) NULL,
 	[yards] [varchar](50) NULL,
 	[clubcode] [varchar](50) NULL,	
-	[playerName] [varchar](50) NULL
-
+	[playerName] [varchar](50) NULL,
  CONSTRAINT [PK_pplayplayer] PRIMARY KEY CLUSTERED 
 (
 	[eid] ASC,
