@@ -581,7 +581,7 @@
                                             "blacklisted": "{\"nextupdate\":1,\"crntdrv\": 3, \"plays\": 4 }",
                                             "whitelisted": "{\"drives\":2}",
                                             "valuefied": "{\"end\": 4, \"start\": 4 }",
-											"keyified":"{}",
+					    "keyified":"{}",
                                             "pivotcol": "[[4]"
                                         }
                                     }
@@ -602,7 +602,7 @@
                                             "blacklisted": "{\"nextupdate\":1}",
                                             "whitelisted": "{\"qtr\":2,\"away\":2,\"home\":2,\"team\":4,\"1\":4,\"2\":4,\"3\":4,\"4\":4,\"5\":4,\"T\":4}",
                                             "valuefied": "{\"away\":2,\"home\":2,\"stats\":3,\"score\":3,\"team\":4}",
-											"keyified":"{\"sequence\": 8}",
+					    "keyified":"{}",
                                             "pivotcol": "[[2]"
                                         }
                                     }
@@ -623,8 +623,8 @@
                                             "blacklisted": "{\"nextupdate\":1,\"crntdrv\": 3, \"players\": 6 }",
                                             "whitelisted": "{\"drives\":2,\"plays\": 4}",
                                             "valuefied": "{}",
-											"keyified":"{\"sequence\": 8}",
-                                            "pivotcol": "[[8]"
+					    "keyified":"{}",
+                                            "pivotcol": "[[6]"
                                         }
                                     }
                                 },
@@ -644,8 +644,8 @@
                                             "blacklisted": "{\"nextupdate\":1,\"crntdrv\": 3}",
                                             "whitelisted": "{\"drives\":2,\"plays\": 4,\"players\":6}",
                                             "valuefied": "{}",
-											"keyified":"{}",
-                                            "pivotcol": "[[8]"
+					    "keyified":"{\"sequence\": 8}",
+                                            "pivotcol": "[[10]"
                                         }
                                     }
                                 },
