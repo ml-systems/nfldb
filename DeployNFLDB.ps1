@@ -2,7 +2,7 @@ $ResourceGroupName    = $args[0]
 $Location             = $args[1]
 $SQLServername        = $args[2].ToLower() #azure requires this to be lower case
 $SQLPassword          = $args[3]
-$StorageAcctName      = $args[4]
+$StorageAcctName      = $args[4].ToLower() #azure requires this to be lower case
 $FunctionAppName      = $args[5]
 
 
