@@ -953,7 +953,7 @@ CREATE TABLE [LandNFL].[playplayer](
 	[objectnameplayer] [varchar](50) NULL,
 	[playerid] [varchar](50) NOT NULL,
 	[objectnamesequence] [varchar](50) NULL,	
-	[sequence] [varchar](50) NULL,
+	[sequence] [varchar](50) NOT NULL,
 	[statId] [varchar](50) NULL,
 	[yards] [varchar](50) NULL,
 	[clubcode] [varchar](50) NULL,	
@@ -963,7 +963,8 @@ CREATE TABLE [LandNFL].[playplayer](
 	[eid] ASC,
 	[drivenumber] ASC,
 	[playnumber] ASC,
-	[playerid] ASC
+	[playerid] ASC,
+	[sequence] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
