@@ -1467,7 +1467,7 @@ CREATE TABLE [MasterNFL].[playplayer](
 	[playnumber] [int] NOT NULL,
 	[playerid] [varchar](50) NOT NULL,
 	[statId] [varchar](50) NULL,
-	[sequence] [varchar](50) NULL,
+	[sequence] [varchar](50) NOT NULL,
 	[playerName] [varchar](50) NULL,
 	[clubcode] [varchar](50) NULL,
 	[yards] [varchar](50) NULL,
