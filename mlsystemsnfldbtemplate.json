@@ -453,7 +453,7 @@
                                     "type": "Http",
                                     "inputs": {
                                         "method": "GET",
-                                        "uri": "http://www.nfl.com/liveupdate/game-center/@{items('For_each')?['GameID']}/@{items('For_each')?['GameID']}_gtd.json"
+                                        "uri": "http://static.nfl.com/liveupdate/game-center/@{items('For_each')?['GameID']}/@{items('For_each')?['GameID']}_gtd.json"
                                     }
                                 },
                                 "Load_Drive_to_Storage": {
@@ -955,7 +955,7 @@
                                     "type": "Http",
                                     "inputs": {
                                         "method": "GET",
-                                        "uri": "http://www.nfl.com/ajax/scorestrip?season=@{variables('Year')}&seasonType=@{items('For_each')?['SeasonType']}&week=@{items('For_each')?['Week']}"
+                                        "uri": "http://static.nfl.com/ajax/scorestrip?season=@{variables('Year')}&seasonType=@{items('For_each')?['SeasonType']}&week=@{items('For_each')?['Week']}"
                                     }
                                 },
                                 "Insert_row": {
