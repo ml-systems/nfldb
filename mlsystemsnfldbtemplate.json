@@ -27,7 +27,7 @@
 		{
 			"name": "[concat(parameters('FunctionApp_name'),'/PShredder')]",
 			"type": "Microsoft.Web/sites",
-			"kind": "functionapp
+			"kind": "functionapp",
 			"apiVersion": "2015-08-01",
 			"properties": {
 				"config": {
