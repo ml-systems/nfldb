@@ -4,6 +4,40 @@
   
   
   
+## Ice-breaker browser game: Get Frodo to Mordor
+
+An interactive, locally hosted web app lives in `web/`. Open `web/index.html` in your browser to run the activity. Each team can:
+
+- Pick a hero (Frodo, Sam, Aragorn, Eleven, Yoda, and more) with unique bonuses.
+- Choose from multiple paths (Northern Pass, Secret Southern Loop, Skyward Shortcut) with stops and challenges.
+- Record how they would handle each challenge and share their plan.
+- Score their run and read a fun narrative of what happened and who won.
+
+### Quick start
+
+```bash
+python -m http.server 8000
+```
+
+Open http://localhost:8000 in a browser. The root page now forwards you into the `web/` folder automatically, so you won't see a blank page if you start the server from the repo root.
+
+### How to test the Frodo ice-breaker locally
+
+1. From the repo root, run a local web server:
+   ```bash
+   python -m http.server 8000
+   ```
+2. Open http://localhost:8000. You should land on the game welcome screen (the root `index.html` forwards into `web/`).
+3. Verify core interactions:
+   - Pick a character tile and confirm their power blurb appears.
+   - Choose a path and see its stops listed with challenges and decision dropdowns.
+   - Enter team name(s), make choices for each stop, and click **Share Plan** to see the recorded decisions.
+   - Click **Score Run** to view the calculated score and generated narrative; try a second team to ensure the leaderboard updates.
+   - Hit **Randomize Team** to auto-pick a hero/path and check the journey tracker animates the icon along the route.
+4. When finished, stop the server with `Ctrl+C`.
+
+---
+
 ## Instructions:
   
 - read the notes  

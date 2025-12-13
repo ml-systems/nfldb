@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frodo's Ice-Breaker Journey</title>
+  <link rel="stylesheet" href="web/style.css" />
+</head>
+<body>
+  <script>
+    // Simple guard to avoid a blank page if this file is opened instead of web/index.html
+    const redirectTarget = 'web/index.html';
+    const openSameFolder = () => {
+      const iframe = document.createElement('iframe');
+      iframe.src = redirectTarget;
+      iframe.title = "Frodo's Ice-Breaker Journey";
+      iframe.style.border = 'none';
+      iframe.style.width = '100%';
+      iframe.style.minHeight = '1200px';
+      iframe.loading = 'eager';
+      document.body.appendChild(iframe);
+    };
+
+    // If the deeper page exists, redirect. Otherwise, embed so the content still renders from disk.
+    fetch(redirectTarget, { method: 'HEAD' })
+      .then((res) => {
+        if (res.ok) {
+          window.location.replace(redirectTarget);
+        } else {
+          openSameFolder();
+        }
+      })
+      .catch(() => openSameFolder());
+  </script>
+  <noscript>
+    <p style="color: #0f172a; font-family: sans-serif; padding: 16px;">Enable JavaScript to load the Frodo ice-breaker experience.</p>
+  </noscript>
+  <p class="note" style="text-align: center; padding: 24px; color: #475569;">Loading the Frodo ice-breaker...</p>
+  <script src="web/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frodo's Ice-Breaker Journey</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Interactive team ice-breaker</p>
+      <h1>Get Frodo to Mordor</h1>
+      <p class="lede">
+        Build a crew, pick a route, debate your plan, and see whose fellowship pulls off the boldest run to Mount Doom.
+      </p>
+      <div class="cta-row">
+        <button id="addTeamBtn" class="primary">Add a team</button>
+        <button id="randomizeBtn" class="ghost">Surprise me</button>
+      </div>
+      <p class="note">Share your team's plan in the text areas so everyone can see the creative choices.</p>
+    </div>
+    <div class="map-graphic" aria-hidden="true">
+      <svg viewBox="0 0 260 140" role="presentation">
+        <defs>
+          <linearGradient id="sky" x1="0%" x2="100%" y1="0%" y2="0%">
+            <stop offset="0%" stop-color="#73c2fb" />
+            <stop offset="100%" stop-color="#d2e9ff" />
+          </linearGradient>
+          <linearGradient id="earth" x1="0%" x2="100%" y1="0%" y2="0%">
+            <stop offset="0%" stop-color="#3d5a2a" />
+            <stop offset="100%" stop-color="#6b8f3b" />
+          </linearGradient>
+        </defs>
+        <rect width="260" height="70" fill="url(#sky)" />
+        <rect y="70" width="260" height="70" fill="url(#earth)" />
+        <path d="M15 95 C60 50, 130 60, 200 45 C230 35, 245 65, 245 85" stroke="#f6c343" stroke-width="4" fill="none" stroke-linecap="round" />
+        <path d="M20 110 C60 90, 120 115, 180 90 C220 80, 240 110, 245 120" stroke="#a461d8" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="6 6" />
+        <g class="mountain">
+          <polygon points="70,70 95,30 120,70" fill="#4c4c6d" />
+          <polygon points="95,30 120,70 95,55" fill="#66668c" />
+          <polygon points="140,80 170,35 200,80" fill="#4c4c6d" />
+          <polygon points="170,35 200,80 170,55" fill="#66668c" />
+        </g>
+        <circle cx="200" cy="40" r="10" fill="#ff7043" />
+        <text x="190" y="45" class="map-label">Mount Doom</text>
+        <text x="12" y="105" class="map-label">Shire</text>
+      </svg>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel" id="setup">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">1. Build your fellowship</p>
+          <h2>Teams, heroes, and powers</h2>
+        </div>
+        <button id="clearTeamsBtn" class="ghost">Reset teams</button>
+      </div>
+      <form id="teamForm" class="team-form">
+        <label>
+          Team name
+          <input type="text" id="teamName" placeholder="The Second Breakfast Club" required />
+        </label>
+        <label>
+          Lead character
+          <select id="leadCharacter"></select>
+        </label>
+        <label>
+          Team battle cry / idea to share
+          <textarea id="teamShare" rows="2" placeholder="Share your creative strategy or twist here"></textarea>
+        </label>
+        <button type="submit" class="primary">Create team card</button>
+      </form>
+      <div class="chips" id="characterList" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" id="paths">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">2. Choose a route</p>
+          <h2>Three ways to sneak into Mordor</h2>
+        </div>
+        <p class="note">Each path has different stops and challenges. Teams can swap paths at any time.</p>
+      </div>
+      <div id="pathGallery" class="path-gallery"></div>
+    </section>
+
+    <section class="panel" id="teams">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">3. Debate decisions</p>
+          <h2>Team dashboards</h2>
+        </div>
+        <p class="note">Each stop has a challenge. Pick an approach and write down the group's idea so others can see it.</p>
+      </div>
+      <div id="teamCards" class="team-cards" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" id="scoreboard">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow">4. Reveal the tale</p>
+          <h2>Scores, success, and story-time</h2>
+        </div>
+        <div class="cta-row">
+          <button id="scoreAllBtn" class="primary">Score all teams</button>
+          <button id="narrateBtn" class="ghost">Generate narratives</button>
+        </div>
+      </div>
+      <div class="score-grid">
+        <div class="scoreboard">
+          <h3>Leaderboard</h3>
+          <ol id="leaderboard"></ol>
+        </div>
+        <div class="narratives">
+          <h3>What happened on the road?</h3>
+          <div id="narrativeList" class="narrative-list"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Open the file locally to run the game. Encourage every group to type their ideas so the room can remix them.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
